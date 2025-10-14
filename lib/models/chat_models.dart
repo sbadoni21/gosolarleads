@@ -1,0 +1,334 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+enum ChatSystemEvent {
+  leadAssigned,
+  leadUnassigned,
+  registrationCompleted,
+  installationCompleted,
+}
+
+
+enum MessageType {
+  text,
+    video,  // Add this
+
+  image,
+  pdf,
+  voice,
+  lead,
+}
+
+class ChatMember {
+  final String uid;
+  final String name;
+  final String email;
+  final DateTime joinedAt;
+
+  ChatMember({
+    required this.uid,
+    required this.name,
+    required this.email,
+    required this.joinedAt,
+  });
+
+  factory ChatMember.fromMap(Map<String, dynamic> map) {
+    return ChatMember(
+      uid: map['uid'] ?? '',
+      name: map['name'] ?? '',
+      email: map['email'] ?? '',
+      joinedAt: (map['joinedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'name': name,
+      'email': email,
+      'joinedAt': Timestamp.fromDate(joinedAt),
+    };
+  }
+}
+
+class ChatGroup {
+  final String id;
+  final String name;
+  final String description;
+  final String workLocation;
+  final String state;
+  final String createdBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<ChatMember> members;
+  final String? lastMessage;
+  final DateTime? lastMessageTime;
+  final String? groupIcon;
+
+  ChatGroup({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.workLocation,
+    required this.state,
+    required this.createdBy,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.members,
+    this.lastMessage,
+    this.lastMessageTime,
+    this.groupIcon,
+  });
+
+  factory ChatGroup.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+    List<ChatMember> membersList = [];
+    if (data['members'] != null) {
+      membersList = (data['members'] as List)
+          .map((member) => ChatMember.fromMap(member as Map<String, dynamic>))
+          .toList();
+    }
+
+    return ChatGroup(
+      id: doc.id,
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      workLocation: data['workLocation'] ?? '',
+      state: data['state'] ?? '',
+      createdBy: data['createdBy'] ?? '',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      members: membersList,
+      lastMessage: data['lastMessage'],
+      lastMessageTime: (data['lastMessageTime'] as Timestamp?)?.toDate(),
+      groupIcon: data['groupIcon'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'description': description,
+      'workLocation': workLocation,
+      'state': state,
+      'createdBy': createdBy,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+      'members': members.map((member) => member.toMap()).toList(),
+      'lastMessage': lastMessage,
+      'lastMessageTime':
+          lastMessageTime != null ? Timestamp.fromDate(lastMessageTime!) : null,
+      'groupIcon': groupIcon,
+    };
+  }
+
+  ChatGroup copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? workLocation,
+    String? state,
+    String? createdBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<ChatMember>? members,
+    String? lastMessage,
+    DateTime? lastMessageTime,
+    String? groupIcon,
+  }) {
+    return ChatGroup(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      workLocation: workLocation ?? this.workLocation,
+      state: state ?? this.state,
+      createdBy: createdBy ?? this.createdBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      members: members ?? this.members,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      groupIcon: groupIcon ?? this.groupIcon,
+    );
+  }
+
+  int get memberCount => members.length;
+  String get locationDisplay => '$workLocation, $state';
+}
+
+class ChatMessage {
+  final String id;
+    final List<String>? readBy;
+
+  final String groupId;
+  final String senderId;
+  final String senderName;
+  final String senderEmail;
+  final MessageType type;
+  final String content;
+  final DateTime timestamp;
+  final String? fileUrl;
+  final String? fileName;
+  final int? fileSizeBytes;
+  final String? leadId;
+  final String? leadName;
+  final int? voiceDurationSeconds;
+  final bool isRead;
+  final String? thumbnailUrl;  // Add this for video thumbnails
+  final int? videoDurationSeconds;  // Add this for video duration
+
+  ChatMessage({
+    required this.id,
+        this.thumbnailUrl,
+            this.readBy,
+
+    this.videoDurationSeconds,
+    required this.groupId,
+    required this.senderId,
+    required this.senderName,
+    required this.senderEmail,
+    required this.type,
+    required this.content,
+    required this.timestamp,
+    this.fileUrl,
+    this.fileName,
+    this.fileSizeBytes,
+    this.leadId,
+    this.leadName,
+    this.voiceDurationSeconds,
+    this.isRead = false,
+  });
+
+  factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+    MessageType messageType = MessageType.text;
+    String typeStr = data['type'] ?? 'text';
+    switch (typeStr) {
+      case 'image':
+        messageType = MessageType.image;
+        break;
+      case 'pdf':
+        messageType = MessageType.pdf;
+        break;
+      case 'voice':
+        messageType = MessageType.voice;
+      
+        break;
+              case 'video':  // Add this
+        messageType = MessageType.video;
+        break;
+      case 'lead':
+        messageType = MessageType.lead;
+        break;
+      default:
+        messageType = MessageType.text;
+    }
+
+    return ChatMessage(
+      id: doc.id,
+      groupId: data['groupId'] ?? '',
+      senderId: data['senderId'] ?? '',
+      senderName: data['senderName'] ?? '',
+      senderEmail: data['senderEmail'] ?? '',
+      type: messageType,
+      thumbnailUrl: data['thumbnailUrl'],
+      videoDurationSeconds: data['videoDurationSeconds'],
+      content: data['content'] ?? '',
+      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      fileUrl: data['fileUrl'],
+      fileName: data['fileName'],
+      fileSizeBytes: data['fileSizeBytes'],
+      leadId: data['leadId'],
+         readBy: data['readBy'] != null 
+          ? List<String>.from(data['readBy']) 
+          : null,
+      leadName: data['leadName'],
+      voiceDurationSeconds: data['voiceDurationSeconds'],
+      isRead: data['isRead'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'groupId': groupId,
+            'thumbnailUrl': thumbnailUrl,
+      'videoDurationSeconds': videoDurationSeconds,
+      'senderId': senderId,
+      'senderName': senderName,
+      'senderEmail': senderEmail,
+      'type': type.name,
+      'content': content,
+      'timestamp': Timestamp.fromDate(timestamp),
+      'fileUrl': fileUrl,
+      'fileName': fileName,
+      'fileSizeBytes': fileSizeBytes,
+      'leadId': leadId,
+            'readBy': readBy,
+
+      'leadName': leadName,
+      'voiceDurationSeconds': voiceDurationSeconds,
+      'isRead': isRead,
+    };
+  }
+
+  ChatMessage copyWith({
+    String? id,
+    String? groupId,
+    String? senderId,
+    String? senderName,
+    String? senderEmail,
+    MessageType? type,
+    String? content,
+    DateTime? timestamp,
+    String? fileUrl,
+    String? fileName,
+    int? fileSizeBytes,
+    String? leadId,
+    String? leadName,
+    int? voiceDurationSeconds,
+    bool? isRead,
+  }) {
+    return ChatMessage(
+      id: id ?? this.id,
+      groupId: groupId ?? this.groupId,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      senderEmail: senderEmail ?? this.senderEmail,
+      type: type ?? this.type,
+      content: content ?? this.content,
+      timestamp: timestamp ?? this.timestamp,
+      fileUrl: fileUrl ?? this.fileUrl,
+      fileName: fileName ?? this.fileName,
+      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+      leadId: leadId ?? this.leadId,
+      leadName: leadName ?? this.leadName,
+      voiceDurationSeconds: voiceDurationSeconds ?? this.voiceDurationSeconds,
+      isRead: isRead ?? this.isRead,
+    );
+  }
+
+  bool get isTextMessage => type == MessageType.text;
+  bool get isImageMessage => type == MessageType.image;
+  bool get isPdfMessage => type == MessageType.pdf;
+  bool get isVoiceMessage => type == MessageType.voice;
+  bool get isLeadMessage => type == MessageType.lead;
+  bool get isVideoMessage => type == MessageType.video;
+
+  String get fileSizeFormatted {
+    if (fileSizeBytes == null) return '';
+    final kb = fileSizeBytes! / 1024;
+    final mb = kb / 1024;
+    if (mb >= 1) {
+      return '${mb.toStringAsFixed(1)} MB';
+    } else {
+      return '${kb.toStringAsFixed(0)} KB';
+    }
+  }
+
+  String get voiceDurationFormatted {
+    if (voiceDurationSeconds == null) return '0:00';
+    final minutes = voiceDurationSeconds! ~/ 60;
+    final seconds = voiceDurationSeconds! % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+}

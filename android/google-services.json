@@ -1,0 +1,142 @@
+{
+  "project_info": {
+    "project_number": "262021635278",
+    "project_id": "gosolar-538ba",
+    "storage_bucket": "gosolar-538ba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262021635278:android:aed53bed156bcf6e49049f",
+        "android_client_info": {
+          "package_name": "com.shivam.gocalculator"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "262021635278-0gi4svoiu1befksec1jevp0a514qmcek.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivam.gocalculator",
+            "certificate_hash": "b63bbae60695efe1a57427b3b1a3e37469cd3484"
+          }
+        },
+        {
+          "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7BdeALyaFEL7rJumdwEnlYFV_gmr5NK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "262021635278-lb8231gqniif4df4ekqn2k9sdjimt10b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shivam.gosolarvendor"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262021635278:android:2f172e3a56b0405e49049f",
+        "android_client_info": {
+          "package_name": "com.shivam.gosolarleads"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7BdeALyaFEL7rJumdwEnlYFV_gmr5NK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "262021635278-lb8231gqniif4df4ekqn2k9sdjimt10b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shivam.gosolarvendor"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262021635278:android:1c9f37495172c6f349049f",
+        "android_client_info": {
+          "package_name": "com.shivam.gosolvendor"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "262021635278-0cn25ip2cb7ohvuc81j4a2al3m2rsb03.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivam.gosolvendor",
+            "certificate_hash": "b63bbae60695efe1a57427b3b1a3e37469cd3484"
+          }
+        },
+        {
+          "client_id": "262021635278-d0q22c3p34l3rhocbaub4lj5t8vt2c86.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivam.gosolvendor",
+            "certificate_hash": "a13925e62358d494d525ea47afcd2057713f8f25"
+          }
+        },
+        {
+          "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7BdeALyaFEL7rJumdwEnlYFV_gmr5NK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "262021635278-lb8231gqniif4df4ekqn2k9sdjimt10b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shivam.gosolarvendor"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
