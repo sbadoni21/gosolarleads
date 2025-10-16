@@ -13,7 +13,8 @@ final allChatGroupsProvider = StreamProvider<List<ChatGroup>>((ref) {
           snapshot.docs.map((doc) => ChatGroup.fromFirestore(doc)).toList());
 });
 
-final specificGroupProvider = StreamProvider.family<ChatGroup?, String>((ref, groupId) {
+final specificGroupProvider =
+    StreamProvider.family<ChatGroup?, String>((ref, groupId) {
   return FirebaseFirestore.instance
       .collection('chatGroups')
       .doc(groupId)
@@ -72,70 +73,91 @@ class ChatService {
     required String userId,
   }) async {
     try {
-      // Get unread messages
-      final unreadMessages = await _firestore
+      final col = _firestore
           .collection('chatGroups')
           .doc(groupId)
-          .collection('messages')
-          .where('senderId', isNotEqualTo: userId)
-          .where('readBy', whereNotIn: [userId])
-          .limit(50)
-          .get();
+          .collection('messages');
 
-      // Mark as read
+      // Fetch a recent slice; filter in Dart to avoid illegal filter combos.
+      // Tune the limit based on your chat volume.
+      final snapshot =
+          await col.orderBy('timestamp', descending: true).limit(200).get();
+
+      if (snapshot.docs.isEmpty) return;
+
       final batch = _firestore.batch();
-      for (var doc in unreadMessages.docs) {
+      int updates = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+
+        final senderId = (data['senderId'] as String?) ?? '';
+        final readByRaw = data['readBy'];
+        final readBy = (readByRaw is List)
+            ? readByRaw.cast<dynamic>().map((e) => e?.toString() ?? '').toList()
+            : const <String>[];
+
+        // Skip own messages
+        if (senderId == userId) continue;
+
+        // Skip if already read
+        if (readBy.contains(userId)) continue;
+
         batch.update(doc.reference, {
           'readBy': FieldValue.arrayUnion([userId]),
+          'isRead': true, // optional if you keep this flag
         });
+
+        updates++;
+
+        // Firestore batch limit safety (max 500)
+        if (updates == 490) {
+          await batch.commit();
+          updates = 0;
+        }
       }
 
-      await batch.commit();
-      print('✅ Marked ${unreadMessages.docs.length} messages as read');
+      if (updates > 0) {
+        await batch.commit();
+      }
+
+      print('✅ Marked $updates messages as read');
     } catch (e) {
       print('❌ Error marking messages as read: $e');
     }
   }
 
-  // UPDATED: Create a new chat group with memberIds
-  Future<String> createGroup({
+// lib/providers/chat_provider.dart (or your chat service file)
+// only the create method signature & write shown
+  Future<void> createGroup({
     required String name,
     required String description,
-    required String workLocation,
     required String state,
     required String createdBy,
     required List<ChatMember> members,
+    List<String> districts = const [], // NEW
+    String? groupIcon,
   }) async {
-    print('📝 Creating group: $name');
-    print('👥 Members: ${members.length}');
-    
-    try {
-      // Extract member UIDs for efficient querying
-      final memberIds = members.map((m) => m.uid).toList();
-      print('🆔 Member IDs: $memberIds');
+    final doc = FirebaseFirestore.instance.collection('chatGroups').doc();
+    final now = DateTime.now();
 
-      final groupData = {
-        'name': name,
-        'description': description,
-        'workLocation': workLocation,
-        'state': state,
-        'createdBy': createdBy,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'members': members.map((m) => m.toMap()).toList(), // Full member objects
-        'memberIds': memberIds, // 🔥 NEW: Simple array of UIDs for querying
-        'lastMessage': null,
-        'lastMessageTime': null,
-        'groupIcon': null,
-      };
+    // keep 'workLocation' as first district for compatibility
+    final workLocation = districts.isNotEmpty ? districts.first : '';
 
-      final docRef = await _firestore.collection('chatGroups').add(groupData);
-      print('✅ Group created with ID: ${docRef.id}');
-      return docRef.id;
-    } catch (e) {
-      print('❌ Failed to create group: $e');
-      throw 'Failed to create group: ${e.toString()}';
-    }
+    await doc.set({
+      'name': name,
+      'description': description,
+      'state': state,
+      'districts': districts,
+      'workLocation': workLocation, // legacy
+      'createdBy': createdBy,
+      'createdAt': Timestamp.fromDate(now),
+      'updatedAt': Timestamp.fromDate(now),
+      'members': members.map((m) => m.toMap()).toList(),
+      'lastMessage': null,
+      'lastMessageTime': null,
+      'groupIcon': groupIcon,
+    });
   }
 
   // Send a text message
@@ -230,7 +252,8 @@ class ChatService {
     }
   }
 
-  Future<({List<ChatMessage> items, List<DocumentSnapshot> rawDocs})> fetchMessagesPage({
+  Future<({List<ChatMessage> items, List<DocumentSnapshot> rawDocs})>
+      fetchMessagesPage({
     required String groupId,
     DocumentSnapshot? startAfter,
     int limit = 30,
@@ -447,14 +470,16 @@ class ChatService {
     required ChatMember member,
   }) async {
     print('➕ Adding member to group: ${member.name} (${member.uid})');
-    
+
     try {
       await _firestore.collection('chatGroups').doc(groupId).update({
-        'members': FieldValue.arrayUnion([member.toMap()]), // Full member object
-        'memberIds': FieldValue.arrayUnion([member.uid]), // 🔥 Also add UID to memberIds
+        'members':
+            FieldValue.arrayUnion([member.toMap()]), // Full member object
+        'memberIds':
+            FieldValue.arrayUnion([member.uid]), // 🔥 Also add UID to memberIds
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       print('✅ Member added successfully');
     } catch (e) {
       print('❌ Failed to add member: $e');
@@ -468,34 +493,38 @@ class ChatService {
     required String memberUid,
   }) async {
     print('➖ Removing member from group: $memberUid');
-    
+
     try {
       // Get the current group data
-      final groupDoc = await _firestore.collection('chatGroups').doc(groupId).get();
-      
+      final groupDoc =
+          await _firestore.collection('chatGroups').doc(groupId).get();
+
       if (!groupDoc.exists) {
         throw 'Group not found';
       }
 
       final groupData = groupDoc.data() as Map<String, dynamic>;
-      
+
       // Get current members array
       final members = (groupData['members'] as List?)
-          ?.map((m) => ChatMember.fromMap(m as Map<String, dynamic>))
-          .toList() ?? [];
+              ?.map((m) => ChatMember.fromMap(m as Map<String, dynamic>))
+              .toList() ??
+          [];
 
       // Remove the member
       members.removeWhere((m) => m.uid == memberUid);
-      
+
       print('👥 Remaining members: ${members.length}');
 
       // Update both members and memberIds
       await _firestore.collection('chatGroups').doc(groupId).update({
-        'members': members.map((m) => m.toMap()).toList(), // Updated members array
-        'memberIds': FieldValue.arrayRemove([memberUid]), // 🔥 Remove UID from memberIds
+        'members':
+            members.map((m) => m.toMap()).toList(), // Updated members array
+        'memberIds':
+            FieldValue.arrayRemove([memberUid]), // 🔥 Remove UID from memberIds
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       print('✅ Member removed successfully');
     } catch (e) {
       print('❌ Failed to remove member: $e');
@@ -573,7 +602,7 @@ class ChatService {
   // Delete group
   Future<void> deleteGroup(String groupId) async {
     print('🗑️ Deleting group: $groupId');
-    
+
     try {
       // Delete all messages first
       final messagesSnapshot = await _firestore
@@ -583,14 +612,14 @@ class ChatService {
           .get();
 
       print('🗑️ Deleting ${messagesSnapshot.docs.length} messages...');
-      
+
       for (var doc in messagesSnapshot.docs) {
         await doc.reference.delete();
       }
 
       // Delete the group (this will also remove memberIds)
       await _firestore.collection('chatGroups').doc(groupId).delete();
-      
+
       print('✅ Group deleted successfully');
     } catch (e) {
       print('❌ Failed to delete group: $e');
@@ -608,6 +637,7 @@ class ChatService {
           'uid': (data['uid'] ?? '') as String,
           'name': (data['name'] ?? '') as String,
           'email': (data['email'] ?? '') as String,
+          'role': (data['role'] ?? '') as String,
         };
       }).toList();
     } catch (e) {
@@ -620,13 +650,13 @@ class ChatService {
 /// Run this ONCE to migrate existing groups to have memberIds field
 Future<void> migrateGroupsToMemberIds() async {
   print('🔄 ========== STARTING GROUP MIGRATION ==========');
-  
+
   try {
     final firestore = FirebaseFirestore.instance;
-    
+
     // Get all chat groups
     final groupsSnapshot = await firestore.collection('chatGroups').get();
-    
+
     print('📊 Found ${groupsSnapshot.docs.length} groups to migrate');
 
     final batch = firestore.batch();
@@ -649,7 +679,7 @@ Future<void> migrateGroupsToMemberIds() async {
 
         // Extract members array
         final members = data['members'];
-        
+
         if (members == null || members is! List || members.isEmpty) {
           print('⚠️ Skipping ${groupName} - no members found');
           skippedCount++;
@@ -681,7 +711,6 @@ Future<void> migrateGroupsToMemberIds() async {
         print('✓ Migrated: $groupName (${memberIds.length} members)');
         print('  Member IDs: $memberIds');
         migratedCount++;
-
       } catch (e) {
         print('❌ Error migrating group ${doc.id}: $e');
         errorCount++;
@@ -700,7 +729,6 @@ Future<void> migrateGroupsToMemberIds() async {
     print('⏭️ Skipped: $skippedCount groups');
     print('❌ Errors: $errorCount groups');
     print('📊 Total: ${groupsSnapshot.docs.length} groups');
-    
   } catch (e, stackTrace) {
     print('❌ Migration failed: $e');
     print('📍 Stack trace: $stackTrace');

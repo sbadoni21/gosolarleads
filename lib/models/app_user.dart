@@ -129,7 +129,7 @@ class AppUser {
   bool get isInstallation => role.toLowerCase() == 'installation';
   bool get isSurvey => role.toLowerCase() == 'survey';
   bool get isSales => role.toLowerCase() == 'sales';
-  bool get isOperations => role.toLowerCase() == 'operations';
+  bool get isOperations => role.toLowerCase() == 'operation';
   
   // Check if user has admin privileges (superadmin or admin)
   bool get hasAdminPrivileges => isSuperAdmin || isAdmin;

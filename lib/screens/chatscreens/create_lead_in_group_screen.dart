@@ -34,8 +34,28 @@ class _CreateLeadInGroupScreenState
   String _selectedStatus = 'unassigned';
   bool _accountStatus = false;
   bool _surveyStatus = false;
-  
-  // Assignment fields
+  String _norm(String? s) => (s ?? '').trim().toLowerCase();
+
+  bool _isSalesUser(Map<String, String?> u) {
+    // common places you might store role info
+    final role = _norm(u['role']);
+    final team = _norm(u['team']);
+    final dept = _norm(u['department']);
+    final title = _norm(u['title']);
+
+    // booleans sometimes used
+    final isSalesFlag = _norm(u['isSales']) == 'true';
+
+    // any of these signals "sales"
+    return isSalesFlag ||
+        role == 'sales' ||
+        team == 'sales' ||
+        dept == 'sales' ||
+        title.contains('sales'); // e.g., "sales officer"
+  }
+
+  String? _selectedLocation;
+  late final List<String> _allowedLocations;
   Map<String, String?>? _selectedSO;
   List<Map<String, String?>> _availableUsers = [];
   bool _loadingUsers = false;
@@ -52,6 +72,8 @@ class _CreateLeadInGroupScreenState
   @override
   void initState() {
     super.initState();
+    _loadGroupMembers();
+    _allowedLocations = _deriveAllowedLocations();
     _loadGroupMembers();
   }
 
@@ -74,12 +96,12 @@ class _CreateLeadInGroupScreenState
     try {
       final chatService = ref.read(chatServiceProvider);
       final users = await chatService.getAllUsers();
-      
+
       // Filter to show only group members
       final groupMemberIds = widget.group.members.map((m) => m.uid).toSet();
       final filteredUsers =
           users.where((u) => groupMemberIds.contains(u['uid'])).toList();
-      
+
       setState(() {
         _availableUsers = filteredUsers;
         _loadingUsers = false;
@@ -115,7 +137,7 @@ class _CreateLeadInGroupScreenState
         email: _emailController.text.trim(),
         number: _numberController.text.trim(),
         address: _addressController.text.trim(),
-        location: widget.group.workLocation,
+        location: _selectedLocation!, // required & restricted
         state: widget.group.state,
         electricityConsumption: _electricityController.text.trim(),
         powercut: _powerCutController.text.trim(),
@@ -192,6 +214,38 @@ class _CreateLeadInGroupScreenState
     }
   }
 
+  List<String> _deriveAllowedLocations() {
+    final List<String> locs = [];
+
+    // Prefer explicit group.districts if present
+    final districts = (widget.group.districts ?? []) as List<dynamic>;
+    if (districts.isNotEmpty) {
+      locs.addAll(districts.map((e) => (e ?? '').toString()));
+    }
+
+    // Or a plural workLocations list if your model has it
+    final workLocations = (widget.group.districts ?? []) as List<dynamic>;
+    if (locs.isEmpty && workLocations.isNotEmpty) {
+      locs.addAll(workLocations.map((e) => (e ?? '').toString()));
+    }
+
+    // Or a single workLocation fallback
+    final wl = (widget.group.workLocation ?? '').toString().trim();
+    if (locs.isEmpty && wl.isNotEmpty) {
+      locs.add(wl);
+    }
+
+    // De-dup + sort
+    final set = <String>{};
+    for (final l in locs) {
+      final v = l.trim();
+      if (v.isNotEmpty) set.add(v);
+    }
+    final out = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return out;
+  }
+
   String _safeInitial(Map<String, String?> user) {
     final name = (user['name'] ?? '').trim();
     if (name.isNotEmpty) return name[0].toUpperCase();
@@ -212,7 +266,8 @@ class _CreateLeadInGroupScreenState
 
   void _showAssignSODialog() {
     final currentUser = ref.read(currentUserProvider).value;
-    final isAdmin = currentUser?.isAdmin == true || currentUser?.isSuperAdmin == true;
+    final isAdmin =
+        currentUser?.isAdmin == true || currentUser?.isSuperAdmin == true;
 
     if (!isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,10 +279,13 @@ class _CreateLeadInGroupScreenState
       return;
     }
 
-    if (_availableUsers.isEmpty) {
+    // NEW: pre-filter to sales members only
+    final salesMembers = _availableUsers.where(_isSalesUser).toList();
+
+    if (salesMembers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No group members available'),
+          content: Text('No Sales members available in this group'),
           backgroundColor: AppTheme.warningAmber,
         ),
       );
@@ -251,20 +309,17 @@ class _CreateLeadInGroupScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Select a Sales Officer from group members:',
-                style: TextStyle(
-                  color: AppTheme.mediumGrey,
-                  fontSize: 14,
-                ),
+                'Select a Sales Officer (Sales role only):',
+                style: TextStyle(color: AppTheme.mediumGrey, fontSize: 14),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 height: 300,
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: _availableUsers.length,
+                  itemCount: salesMembers.length, // NEW: filtered list
                   itemBuilder: (context, index) {
-                    final user = _availableUsers[index];
+                    final user = salesMembers[index]; // NEW
                     final uid = (user['uid'] ?? '').trim();
                     final isSelected = _selectedSO?['uid'] == uid;
 
@@ -286,15 +341,11 @@ class _CreateLeadInGroupScreenState
                       title: Text(_safeDisplayName(user)),
                       subtitle: Text((user['email'] ?? '').trim()),
                       trailing: isSelected
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: AppTheme.primaryBlue,
-                            )
+                          ? const Icon(Icons.check_circle,
+                              color: AppTheme.primaryBlue)
                           : null,
                       onTap: () {
-                        setState(() {
-                          _selectedSO = user;
-                        });
+                        setState(() => _selectedSO = user);
                         Navigator.pop(dialogCtx);
                       },
                     );
@@ -308,15 +359,11 @@ class _CreateLeadInGroupScreenState
           if (_selectedSO != null)
             TextButton(
               onPressed: () {
-                setState(() {
-                  _selectedSO = null;
-                });
+                setState(() => _selectedSO = null);
                 Navigator.pop(dialogCtx);
               },
-              child: const Text(
-                'Clear Selection',
-                style: TextStyle(color: AppTheme.errorRed),
-              ),
+              child: const Text('Clear Selection',
+                  style: TextStyle(color: AppTheme.errorRed)),
             ),
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
@@ -330,7 +377,8 @@ class _CreateLeadInGroupScreenState
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.read(currentUserProvider).value;
-    final isAdmin = currentUser?.isAdmin == true || currentUser?.isSuperAdmin == true;
+    final isAdmin =
+        currentUser?.isAdmin == true || currentUser?.isSuperAdmin == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -342,52 +390,6 @@ class _CreateLeadInGroupScreenState
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Group Info Card
-            Card(
-              color: AppTheme.primaryBlue.withOpacity(0.1),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.group, color: AppTheme.primaryBlue),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.group.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: AppTheme.mediumGrey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.group.locationDisplay,
-                          style: const TextStyle(
-                            color: AppTheme.mediumGrey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
             // Required Fields Section
             _buildSectionHeader('Lead Details', true),
             const SizedBox(height: 16),
@@ -410,7 +412,61 @@ class _CreateLeadInGroupScreenState
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+
+            if (_allowedLocations.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.warningAmber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: AppTheme.warningAmber.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        color: AppTheme.warningAmber),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'No work locations configured for this group. Ask an admin to add districts/locations before creating leads.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: _selectedLocation,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'Select Location *',
+                  prefixIcon: const Icon(Icons.place_outlined),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                items: _allowedLocations
+                    .map((loc) => DropdownMenuItem(
+                          value: loc,
+                          child: Text(
+                            loc,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedLocation = v),
+                validator: (v) {
+                  if (_allowedLocations.isEmpty)
+                    return 'No allowed locations for this group';
+                  if (v == null || v.trim().isEmpty)
+                    return 'Please select a location';
+                  return null;
+                },
+              ),
+            const SizedBox(height: 8),
 
             // Number Field
             TextFormField(
@@ -442,7 +498,6 @@ class _CreateLeadInGroupScreenState
             if (isAdmin) ...[
               _buildSectionHeader('Assignment (Optional)'),
               const SizedBox(height: 12),
-              
               if (_loadingUsers)
                 const Center(
                   child: Padding(
@@ -535,7 +590,6 @@ class _CreateLeadInGroupScreenState
                     ),
                   ),
                 ),
-              
               if (_selectedSO != null) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -568,12 +622,11 @@ class _CreateLeadInGroupScreenState
                   ),
                 ),
               ],
-              
               const SizedBox(height: 24),
             ],
 
             // Contact Information Section
-            _buildSectionHeader('Contact Information'),
+            _buildSectionHeader('Contact Information (Optional)'),
             const SizedBox(height: 12),
 
             // Email Field
@@ -615,7 +668,7 @@ class _CreateLeadInGroupScreenState
             const SizedBox(height: 24),
 
             // Energy Details Section
-            _buildSectionHeader('Energy Details'),
+            _buildSectionHeader('Energy Details (Optional)'),
             const SizedBox(height: 12),
 
             // Electricity Consumption Field
@@ -649,23 +702,8 @@ class _CreateLeadInGroupScreenState
             const SizedBox(height: 24),
 
             // Business Details Section
-            _buildSectionHeader('Business Details'),
+            _buildSectionHeader('Pricing Details'),
             const SizedBox(height: 12),
-
-            // Incentive Field
-            TextFormField(
-              controller: _incentiveController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Incentive (₹)',
-                hintText: 'Enter incentive amount',
-                prefixIcon: const Icon(Icons.currency_rupee_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
 
             // Pitched Amount Field
             TextFormField(
@@ -682,34 +720,8 @@ class _CreateLeadInGroupScreenState
             ),
             const SizedBox(height: 24),
 
-            // Status & Progress Section
-            _buildSectionHeader('Status & Progress'),
-            const SizedBox(height: 12),
-
             // Status Dropdown (Only show if not assigning)
-            if (_selectedSO == null)
-              DropdownButtonFormField<String>(
-                value: _selectedStatus,
-                decoration: InputDecoration(
-                  labelText: 'Lead Status',
-                  prefixIcon: const Icon(Icons.flag_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                items: _statusOptions.map((status) {
-                  return DropdownMenuItem(
-                    value: status,
-                    child: Text(_getStatusLabel(status)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedStatus = value!;
-                  });
-                },
-              )
-            else
+            if (_selectedSO != null)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -742,77 +754,6 @@ class _CreateLeadInGroupScreenState
                 ),
               ),
             const SizedBox(height: 16),
-
-            // Status Switches Card
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Account Status Switch
-                    SwitchListTile(
-                      value: _accountStatus,
-                      onChanged: (value) {
-                        setState(() {
-                          _accountStatus = value;
-                        });
-                      },
-                      title: const Text('Account Status'),
-                      subtitle: Text(
-                        _accountStatus ? 'Active' : 'Inactive',
-                        style: TextStyle(
-                          color: _accountStatus
-                              ? AppTheme.successGreen
-                              : AppTheme.mediumGrey,
-                          fontSize: 12,
-                        ),
-                      ),
-                      secondary: Icon(
-                        _accountStatus
-                            ? Icons.account_circle
-                            : Icons.account_circle_outlined,
-                        color: _accountStatus
-                            ? AppTheme.successGreen
-                            : AppTheme.mediumGrey,
-                      ),
-                    ),
-                    const Divider(),
-                    // Survey Status Switch
-                    SwitchListTile(
-                      value: _surveyStatus,
-                      onChanged: (value) {
-                        setState(() {
-                          _surveyStatus = value;
-                        });
-                      },
-                      title: const Text('Survey Status'),
-                      subtitle: Text(
-                        _surveyStatus ? 'Completed' : 'Pending',
-                        style: TextStyle(
-                          color: _surveyStatus
-                              ? AppTheme.successGreen
-                              : AppTheme.mediumGrey,
-                          fontSize: 12,
-                        ),
-                      ),
-                      secondary: Icon(
-                        _surveyStatus
-                            ? Icons.assignment_turned_in
-                            : Icons.assignment_outlined,
-                        color: _surveyStatus
-                            ? AppTheme.successGreen
-                            : AppTheme.mediumGrey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
 
             // Additional Information Section
             _buildSectionHeader('Additional Information'),
@@ -893,7 +834,8 @@ class _CreateLeadInGroupScreenState
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.add_circle_outline, color: Colors.white),
+                          const Icon(Icons.add_circle_outline,
+                              color: Colors.white),
                           const SizedBox(width: 8),
                           Text(
                             _selectedSO != null

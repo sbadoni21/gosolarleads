@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gosolarleads/pagination/chat_pagination.dart';
@@ -507,6 +507,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _showAssignSODialog(LeadPool lead) async {
+    // --- quick helpers ---
+    String _norm(String? s) => (s ?? '').trim().toLowerCase();
+    bool _isSalesUser(Map<String, String?> u) {
+      final role = _norm(u['role']);
+      final team = _norm(u['team']);
+      final dept = _norm(u['department']);
+      final title = _norm(u['title']);
+      final isSalesFlag = _norm(u['isSales']) == 'true';
+      return isSalesFlag ||
+          role == 'sales' ||
+          team == 'sales' ||
+          dept == 'sales' ||
+          title.contains('sales');
+    }
+
     final currentUser = ref.read(currentUserProvider).value;
     final chatService = ref.read(chatServiceProvider);
     final leadService = ref.read(leadServiceProvider);
@@ -514,22 +529,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     final canAssign =
         currentUser?.isAdmin == true || currentUser?.isSuperAdmin == true;
-
     if (!canAssign) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.lock, color: Colors.white),
-              const SizedBox(width: 12),
-              const Expanded(child: Text('Only admins can assign leads')),
-            ],
-          ),
+        const SnackBar(
+          content: Text('Only admins can assign leads'),
           backgroundColor: AppTheme.errorRed,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       return;
@@ -553,14 +558,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     try {
       final users = await chatService.getAllUsers();
       final groupMemberIds = widget.group.members.map((m) => m.uid).toSet();
-      final availableUsers =
-          users.where((u) => groupMemberIds.contains(u['uid'])).toList();
 
-      if (availableUsers.isEmpty) {
+      // SALES ONLY
+      final salesMembers = users
+          .where((u) => groupMemberIds.contains((u['uid'] ?? '').trim()))
+          .where((u) => _isSalesUser(u as Map<String, String?>))
+          .toList();
+
+      if (salesMembers.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No group members available for assignment'),
+            content: Text('No Sales members available in this group'),
             backgroundColor: AppTheme.warningAmber,
           ),
         );
@@ -569,11 +578,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
       if (!mounted) return;
 
+      final screenH = MediaQuery.of(context).size.height;
+      final listHeight =
+          math.min(320.0, screenH * 0.5); // hard cap to avoid overflow
+
       showDialog(
         context: rootContext,
         builder: (dialogCtx) => AlertDialog(
+          // keeps dialog compact and prevents intrinsic dimension issues
+          scrollable: false,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+
           title: Row(
             children: [
               Container(
@@ -594,199 +613,181 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
             ],
           ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightGrey,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.person,
-                              size: 16, color: AppTheme.primaryBlue),
-                          const SizedBox(width: 8),
-                          Text(
-                            lead.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.group,
-                              size: 14, color: AppTheme.mediumGrey),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.group.name,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.mediumGrey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Select Sales Officer:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 300,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: availableUsers.length,
-                    itemBuilder: (context, index) {
-                      final user = availableUsers[index];
-                      final uid = (user['uid'] ?? '').trim();
-                      final isCurrentlyAssigned = lead.assignedTo == uid;
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: isCurrentlyAssigned
-                              ? AppTheme.primaryBlue.withOpacity(0.1)
+          content: Column(
+            mainAxisSize:
+                MainAxisSize.min, // critical: no shrink-wrap ask to viewport
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Lead summary
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.lightGrey,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.person,
+                          size: 16, color: AppTheme.primaryBlue),
+                      const SizedBox(width: 8),
+                      Text(lead.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                    ]),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Icon(Icons.group,
+                          size: 14, color: AppTheme.mediumGrey),
+                      const SizedBox(width: 8),
+                      Text(widget.group.name,
+                          style: const TextStyle(
+                              fontSize: 13, color: AppTheme.mediumGrey)),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Select Sales Officer:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(height: 12),
+
+              // FIX: give the internal ListView a fixed height so it never asks for intrinsics
+              SizedBox(
+                height: listHeight,
+                width: double.maxFinite,
+                child: ListView.builder(
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: salesMembers.length,
+                  itemBuilder: (context, index) {
+                    final user = salesMembers[index] as Map<String, dynamic>;
+                    final uid = (user['uid'] ?? '').toString().trim();
+                    final isCurrent = lead.assignedTo == uid;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? AppTheme.primaryBlue.withOpacity(0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isCurrent
+                              ? AppTheme.primaryBlue
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isCurrentlyAssigned
-                                ? AppTheme.primaryBlue
-                                : Colors.transparent,
+                        ),
+                      ),
+                      child: ListTile(
+                        // avoid Hero in dialogs
+                        leading: CircleAvatar(
+                          backgroundColor: isCurrent
+                              ? AppTheme.primaryBlue
+                              : AppTheme.primaryBlue.withOpacity(0.1),
+                          child: Text(
+                            _safeInitial(
+                                user.map((k, v) => MapEntry(k, v?.toString()))),
+                            style: TextStyle(
+                              color: isCurrent
+                                  ? Colors.white
+                                  : AppTheme.primaryBlue,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        child: ListTile(
-                          leading: Hero(
-                            tag: 'avatar_$uid',
-                            child: CircleAvatar(
-                              backgroundColor: isCurrentlyAssigned
-                                  ? AppTheme.primaryBlue
-                                  : AppTheme.primaryBlue.withOpacity(0.1),
-                              child: Text(
-                                _safeInitial(user),
-                                style: TextStyle(
-                                  color: isCurrentlyAssigned
-                                      ? Colors.white
-                                      : AppTheme.primaryBlue,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            _safeDisplayName(user),
-                            style: TextStyle(
-                              fontWeight: isCurrentlyAssigned
+                        title: Text(
+                          _safeDisplayName(
+                              user.map((k, v) => MapEntry(k, v?.toString()))),
+                          style: TextStyle(
+                              fontWeight: isCurrent
                                   ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                          subtitle: Text((user['email'] ?? '').trim()),
-                          trailing: isCurrentlyAssigned
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primaryBlue,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Text(
-                                    'Current',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 16,
-                                  color: AppTheme.mediumGrey,
+                                  : FontWeight.normal),
+                        ),
+                        subtitle: Text((user['email'] ?? '').toString().trim()),
+                        trailing: isCurrent
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryBlue,
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                          onTap: () async {
-                            Navigator.pop(dialogCtx);
-                            showDialog(
-                              context: rootContext,
-                              barrierDismissible: false,
-                              builder: (context) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
+                                child: const Text('Current',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold)),
+                              )
+                            : const Icon(Icons.arrow_forward_ios,
+                                size: 16, color: AppTheme.mediumGrey),
+                        onTap: () async {
+                          Navigator.pop(dialogCtx);
+
+                          // lightweight loader dialog (no intrinsic issues)
+                          showDialog(
+                            context: rootContext,
+                            barrierDismissible: false,
+                            builder: (_) => const Dialog(
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                          );
+
+                          try {
+                            await leadService.assignSalesOfficer(
+                              leadId: lead.uid,
+                              soUid: uid,
+                              soName: _safeDisplayName(user
+                                  .map((k, v) => MapEntry(k, v?.toString()))),
                             );
 
-                            try {
-                              await leadService.assignSalesOfficer(
-                                leadId: lead.uid,
-                                soUid: uid,
-                                soName: _safeDisplayName(user),
-                              );
-
-                              // Cloud Function will automatically send notifications
-                              // via onLeadAssignmentChanged trigger
-
-                              if (mounted) {
-                                Navigator.pop(rootContext);
-                                ScaffoldMessenger.of(rootContext).showSnackBar(
-                                  SnackBar(
-                                    content: Row(
-                                      children: [
-                                        const Icon(Icons.check_circle,
-                                            color: Colors.white),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                              'Assigned to ${_safeDisplayName(user)}'),
+                            if (mounted) {
+                              Navigator.of(rootContext, rootNavigator: true)
+                                  .pop();
+                              ScaffoldMessenger.of(rootContext).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle,
+                                          color: Colors.white),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Assigned to ${_safeDisplayName(user.map((k, v) => MapEntry(k, v?.toString())))}',
                                         ),
-                                      ],
-                                    ),
-                                    backgroundColor: AppTheme.successGreen,
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                Navigator.pop(rootContext);
-                                ScaffoldMessenger.of(rootContext).showSnackBar(
-                                  SnackBar(
-                                    content: Text(e.toString()),
-                                    backgroundColor: AppTheme.errorRed,
-                                  ),
-                                );
-                              }
+                                  backgroundColor: AppTheme.successGreen,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
                             }
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                          } catch (e) {
+                            if (mounted) {
+                              Navigator.of(rootContext, rootNavigator: true)
+                                  .pop();
+                              ScaffoldMessenger.of(rootContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(e.toString()),
+                                  backgroundColor: AppTheme.errorRed,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+
           actions: [
             if (lead.isAssigned)
               TextButton.icon(
@@ -795,49 +796,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   showDialog(
                     context: rootContext,
                     barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
+                    builder: (_) => const Dialog(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      child: Center(child: CircularProgressIndicator()),
                     ),
                   );
-
                   try {
                     await leadService.unassignSalesOfficer(lead.uid);
                     if (mounted) {
-                      Navigator.pop(rootContext);
+                      Navigator.of(rootContext, rootNavigator: true).pop();
                       ScaffoldMessenger.of(rootContext).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.info, color: Colors.white),
-                              const SizedBox(width: 12),
-                              const Expanded(child: Text('SO unassigned')),
-                            ],
-                          ),
+                        const SnackBar(
+                          content: Text('SO unassigned'),
                           backgroundColor: AppTheme.warningAmber,
                           behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
                         ),
                       );
                     }
                   } catch (e) {
                     if (mounted) {
-                      Navigator.pop(rootContext);
+                      Navigator.of(rootContext, rootNavigator: true).pop();
                       ScaffoldMessenger.of(rootContext).showSnackBar(
                         SnackBar(
-                          content: Text(e.toString()),
-                          backgroundColor: AppTheme.errorRed,
-                        ),
+                            content: Text(e.toString()),
+                            backgroundColor: AppTheme.errorRed),
                       );
                     }
                   }
                 },
                 icon: const Icon(Icons.person_remove, size: 18),
                 label: const Text('Unassign'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.errorRed,
-                ),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
               ),
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
@@ -850,9 +840,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppTheme.errorRed,
-          ),
+              content: Text(e.toString()), backgroundColor: AppTheme.errorRed),
         );
       }
     }
@@ -893,12 +881,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 child: CircleAvatar(
                   backgroundColor: Colors.white,
                   radius: 20,
-                  child: Text(
-                    widget.group.name[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: AppTheme.lightBlue,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: ClipOval(
+                    child: widget.group.groupIcon != null &&
+                            widget.group.groupIcon!.isNotEmpty
+                        ? Image.network(
+                            widget.group.groupIcon!,
+                            fit: BoxFit.cover,
+                            width: 40,
+                            height: 40,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Text(
+                                widget.group.name.isNotEmpty
+                                    ? widget.group.name[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: AppTheme.lightBlue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          )
+                        : Center(
+                            child: Text(
+                              widget.group.name.isNotEmpty
+                                  ? widget.group.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: AppTheme.lightBlue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -1006,9 +1019,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           Column(
             children: [
               // Messages List
+
               Expanded(
                 child: _buildMessagesList(paginationState, currentUser),
               ),
+
               // In your chat_screen.dart, replace the "Message Input" section with:
 
 // Attachment Menu with Animation
@@ -1121,6 +1136,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               const Icon(Icons.error_outline,
                                   color: Colors.white),

@@ -337,26 +337,26 @@ class _SurveyFormScreenState extends ConsumerState<SurveyFormScreen> {
             inverterImageFile: _inverterImageFile,
             plantImageFile: _plantImageFile,
           );
-if (status == 'submitted') {
-  try {
-    final user = ref.read(currentUserProvider).value;
-    final callable = FirebaseFunctions.instance
-        .httpsCallable('sendSurveySubmittedNotification');
+      if (status == 'submitted') {
+        try {
+          final user = ref.read(currentUserProvider).value;
+          final callable = FirebaseFunctions.instance
+              .httpsCallable('sendSurveySubmittedNotification');
 
-    await callable.call({
-      'leadId': widget.leadId,
-      'surveyorUid': user?.uid ?? '',
-      'surveyorName': (user?.name?.trim().isNotEmpty == true)
-          ? user!.name
-          : (user?.email ?? 'Surveyor'),
-      'plantType': _plantType ?? '',
-      'kw': _numberOfKWController.text.trim(),
-    });
-  } catch (e) {
-    // Don’t block UX if notification send fails
-    debugPrint('sendSurveySubmittedNotification error: $e');
-  }
-}
+          await callable.call({
+            'leadId': widget.leadId,
+            'surveyorUid': user?.uid ?? '',
+            'surveyorName': (user?.name?.trim().isNotEmpty == true)
+                ? user!.name
+                : (user?.email ?? 'Surveyor'),
+            'plantType': _plantType ?? '',
+            'kw': _numberOfKWController.text.trim(),
+          });
+        } catch (e) {
+          // Don’t block UX if notification send fails
+          debugPrint('sendSurveySubmittedNotification error: $e');
+        }
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -382,11 +382,12 @@ if (status == 'submitted') {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
+        automaticallyImplyLeading: true,
         title: const Text('Solar Plant Survey Form'),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        titleTextStyle: TextStyle(color: Colors.white, fontSize: 18),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

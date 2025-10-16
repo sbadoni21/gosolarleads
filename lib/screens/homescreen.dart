@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gosolarleads/providers/auth_provider.dart';
 import 'package:gosolarleads/screens/authentication.dart';
+import 'package:gosolarleads/screens/installationscreens/installation_screens.dart';
 import 'package:gosolarleads/screens/leads/sales_dashboard_screen.dart';
+import 'package:gosolarleads/screens/operations/operation_dashboard_screen.dart';
 import 'package:gosolarleads/screens/surveyscreens/survey_screen.dart';
 import 'package:gosolarleads/tabs/chattab.dart';
 import 'package:gosolarleads/tabs/leadtab.dart';
@@ -40,7 +42,6 @@ class Homescreen extends ConsumerWidget {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
-        // Not logged in yet
         if (user == null) {
           return const AuthenticationScreen();
         }
@@ -49,6 +50,8 @@ class Homescreen extends ConsumerWidget {
         final isAdmin = role == 'admin' || role == 'superadmin';
         final isSalesOfficer = role == 'sales' || role == 'salesofficer';
         final isSurveyor = role == 'survey';
+        final isInstallation = role == 'installation';
+        final isOperation = role == 'operation';
 
         if (isSurveyor) {
           return const SurveysListScreen();
@@ -58,6 +61,10 @@ class Homescreen extends ConsumerWidget {
         final showLeadsTab = isAdmin;
 
         final tabs = <Tab>[
+          if (isOperation)
+            const Tab(icon: Icon(Icons.work), text: "Operations"),
+          if (isInstallation)
+            const Tab(icon: Icon(Icons.settings), text: 'Installation'),
           if (showSalesTab)
             const Tab(icon: Icon(Icons.person_2_outlined), text: 'Sales'),
           const Tab(icon: Icon(Icons.chat_bubble_outline), text: 'Chat'),
@@ -69,6 +76,8 @@ class Homescreen extends ConsumerWidget {
         ];
 
         final views = <Widget>[
+          if (isOperation) const OperationsDashboardScreen(),
+          if (isInstallation) const InstallationScreens(),
           if (showSalesTab) const SalesDashboardScreen(),
           const ChatTab(),
           if (showLeadsTab) const LeadTab(),

@@ -5,7 +5,8 @@ import 'package:gosolarleads/models/lead_note_models.dart';
 import 'package:gosolarleads/models/offer.dart';
 import 'package:gosolarleads/providers/auth_provider.dart';
 
-final leadStreamProvider = StreamProvider.family<LeadPool?, String>((ref, leadId) {
+final leadStreamProvider =
+    StreamProvider.family<LeadPool?, String>((ref, leadId) {
   return ref.read(leadServiceProvider).watchLeadById(leadId);
 });
 // Add this near the top with other providers
@@ -151,33 +152,32 @@ class LeadService {
     } catch (e) {
       throw 'Failed to update survey status: ${e.toString()}';
     }
-  }// Add to LeadService class
-Future<void> saveSlaBreachReason({
-  required String leadId,
-  required String slaType, // 'registration' or 'installation'
-  required String reason,
-  required String recordedByUid,
-  required String recordedByName,
-}) async {
-  final fieldPrefix = slaType == 'registration' ? 'registration' : 'installation';
-  
-  await FirebaseFirestore.instance
-      .collection('leadPool')
-      .doc(leadId)
-      .update({
-    '${fieldPrefix}SlaBreachReason': reason,
-    '${fieldPrefix}SlaBreachRecordedAt': FieldValue.serverTimestamp(),
-    '${fieldPrefix}SlaBreachRecordedBy': recordedByName,
-  });
+  } // Add to LeadService class
 
-  // Also add a comment for audit trail
-  await addComment(
-    leadId: leadId,
-    authorUid: recordedByUid,
-    authorName: recordedByName,
-    text: '🚨 SLA Breach Reason (${slaType.toUpperCase()}): $reason',
-  );
-}
+  Future<void> saveSlaBreachReason({
+    required String leadId,
+    required String slaType, // 'registration' or 'installation'
+    required String reason,
+    required String recordedByUid,
+    required String recordedByName,
+  }) async {
+    final fieldPrefix =
+        slaType == 'registration' ? 'registration' : 'installation';
+
+    await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
+      '${fieldPrefix}SlaBreachReason': reason,
+      '${fieldPrefix}SlaBreachRecordedAt': FieldValue.serverTimestamp(),
+      '${fieldPrefix}SlaBreachRecordedBy': recordedByName,
+    });
+
+    // Also add a comment for audit trail
+    await addComment(
+      leadId: leadId,
+      authorUid: recordedByUid,
+      authorName: recordedByName,
+      text: '🚨 SLA Breach Reason (${slaType.toUpperCase()}): $reason',
+    );
+  }
 
   // Update account status
   Future<void> updateAccountStatus(String leadId, bool accountStatus) async {
@@ -212,16 +212,15 @@ Future<void> saveSlaBreachReason({
   Future<void> startRegistrationSla(String leadId) async {
     try {
       final now = DateTime.now();
-      final registrationSlaEnd = now.add(const Duration(days: 30));
+      final registrationSlaEnd = now.add(const Duration(days: 3));
 
       await _firestore.collection('leadPool').doc(leadId).update({
         'registrationSlaStartDate': Timestamp.fromDate(now),
         'registrationSlaEndDate': Timestamp.fromDate(registrationSlaEnd),
         'registrationCompletedAt': null,
-              'installationSlaStartDate': null,
-      'installationSlaEndDate': null,
-      'installationCompletedAt': null,
-        
+        'installationSlaStartDate': null,
+        'installationSlaEndDate': null,
+        'installationCompletedAt': null,
       });
     } catch (e) {
       throw 'Failed to start registration SLA: ${e.toString()}';
@@ -229,150 +228,163 @@ Future<void> saveSlaBreachReason({
   }
 // IN: lib/providers/leadpool_provider.dart (append inside LeadService)
 
-Future<void> addComment({
-  required String leadId,
-  required String authorUid,
-  required String authorName,
-  required String text,
-}) async {
-  final col = _firestore.collection('leadPool').doc(leadId).collection('comments');
-  await col.add({
-    'leadId': leadId,
-    'authorUid': authorUid,
-    'authorName': authorName,
-    'text': text.trim(),
-    'createdAt': Timestamp.now(),
-  });
-}
-
-/// Creates a reminder and also drops a notification record for your existing feed.
-Future<void> addReminder({
-  required String leadId,
-  required String ownerUid,
-  required String ownerName,
-  required String note,
-  required DateTime scheduledAt,
-}) async {
-  final batch = _firestore.batch();
-  final rDoc = _firestore.collection('leadPool').doc(leadId).collection('reminders').doc();
-  batch.set(rDoc, {
-    'leadId': leadId,
-    'ownerUid': ownerUid,
-    'ownerName': ownerName,
-    'note': note.trim(),
-    'scheduledAt': Timestamp.fromDate(scheduledAt),
-    'done': false,
-    'createdAt': Timestamp.now(),
-  });
-
-  // optional: user-facing notification doc your app already uses
-  final notif = _firestore.collection('notifications').doc();
-  batch.set(notif, {
-    'userId': ownerUid,
-    'title': 'Lead Reminder',
-    'body': '$note • ${scheduledAt.toLocal()}',
-    'leadId': leadId,
-    'type': 'lead_reminder',
-    'createdAt': Timestamp.now(),
-    'scheduledAt': Timestamp.fromDate(scheduledAt),
-    'read': false,
-  });
-
-  await batch.commit();
-}
-
-Future<void> markReminderDone(String leadId, String reminderId, bool done) {
-  return _firestore
-      .collection('leadPool').doc(leadId)
-      .collection('reminders').doc(reminderId)
-      .update({'done': done});
-}
-
-/// Update status; if rejected, store reason/metadata.
-Future<void> updateStatusWithReason({
-  required String leadId,
-  required String status,
-  String? reason,
-  String? byUid,
-  String? byName,
-}) async {
-  final data = <String, dynamic>{'status': status};
-  if (status.trim().toLowerCase() == 'rejected') {
-    data.addAll({
-      'rejectionReason': (reason ?? '').trim(),
-      'rejectedByUid': byUid,
-      'rejectedByName': byName,
-      'rejectedAt': Timestamp.now(),
-    });
-  } else {
-    // clear old rejection fields to avoid confusion
-    data.addAll({
-      'rejectionReason': FieldValue.delete(),
-      'rejectedByUid': FieldValue.delete(),
-      'rejectedByName': FieldValue.delete(),
-      'rejectedAt': FieldValue.delete(),
+  Future<void> addComment({
+    required String leadId,
+    required String authorUid,
+    required String authorName,
+    required String text,
+  }) async {
+    final col =
+        _firestore.collection('leadPool').doc(leadId).collection('comments');
+    await col.add({
+      'leadId': leadId,
+      'authorUid': authorUid,
+      'authorName': authorName,
+      'text': text.trim(),
+      'createdAt': Timestamp.now(),
     });
   }
-  await _firestore.collection('leadPool').doc(leadId).update(data);
-}
 
-/// Toggle boolean milestones and optionally attach proof URL(s).
-Future<void> updateMilestones({
-  required String leadId,
-  bool? registrationDone,
-  bool? loanProcessDone,
-  bool? installationStarted,
-  String? proofUrl, // optional single proof; you can extend to a list
-  String? proofLabel,
-  String? byUid,
-  String? byName,
-}) async {
-  final updates = <String, dynamic>{};
-  if (registrationDone != null) updates['registrationDone'] = registrationDone;
-  if (loanProcessDone != null) updates['loanProcessDone'] = loanProcessDone;
-  if (installationStarted != null) updates['installationStarted'] = installationStarted;
+  /// Creates a reminder and also drops a notification record for your existing feed.
+  Future<void> addReminder({
+    required String leadId,
+    required String ownerUid,
+    required String ownerName,
+    required String note,
+    required DateTime scheduledAt,
+  }) async {
+    final batch = _firestore.batch();
+    final rDoc = _firestore
+        .collection('leadPool')
+        .doc(leadId)
+        .collection('reminders')
+        .doc();
+    batch.set(rDoc, {
+      'leadId': leadId,
+      'ownerUid': ownerUid,
+      'ownerName': ownerName,
+      'note': note.trim(),
+      'scheduledAt': Timestamp.fromDate(scheduledAt),
+      'done': false,
+      'createdAt': Timestamp.now(),
+    });
 
-  // store proof as subcollection item for audit/history
-  if (proofUrl != null && proofUrl.isNotEmpty) {
-    final proofDoc = _firestore
-        .collection('leadPool').doc(leadId)
-        .collection('proofs').doc();
-    await _firestore.runTransaction((tx) async {
-      tx.update(_firestore.collection('leadPool').doc(leadId), updates);
-      tx.set(proofDoc, {
-        'url': proofUrl,
-        'label': proofLabel ?? 'Proof',
-        'uploadedByUid': byUid,
-        'uploadedByName': byName,
-        'createdAt': Timestamp.now(),
+    // optional: user-facing notification doc your app already uses
+    final notif = _firestore.collection('notifications').doc();
+    batch.set(notif, {
+      'userId': ownerUid,
+      'title': 'Lead Reminder',
+      'body': '$note • ${scheduledAt.toLocal()}',
+      'leadId': leadId,
+      'type': 'lead_reminder',
+      'createdAt': Timestamp.now(),
+      'scheduledAt': Timestamp.fromDate(scheduledAt),
+      'read': false,
+    });
+
+    await batch.commit();
+  }
+
+  Future<void> markReminderDone(String leadId, String reminderId, bool done) {
+    return _firestore
+        .collection('leadPool')
+        .doc(leadId)
+        .collection('reminders')
+        .doc(reminderId)
+        .update({'done': done});
+  }
+
+  /// Update status; if rejected, store reason/metadata.
+  Future<void> updateStatusWithReason({
+    required String leadId,
+    required String status,
+    String? reason,
+    String? byUid,
+    String? byName,
+  }) async {
+    final data = <String, dynamic>{'status': status};
+    if (status.trim().toLowerCase() == 'rejected') {
+      data.addAll({
+        'rejectionReason': (reason ?? '').trim(),
+        'rejectedByUid': byUid,
+        'rejectedByName': byName,
+        'rejectedAt': Timestamp.now(),
       });
-    });
-    return;
+    } else {
+      // clear old rejection fields to avoid confusion
+      data.addAll({
+        'rejectionReason': FieldValue.delete(),
+        'rejectedByUid': FieldValue.delete(),
+        'rejectedByName': FieldValue.delete(),
+        'rejectedAt': FieldValue.delete(),
+      });
+    }
+    await _firestore.collection('leadPool').doc(leadId).update(data);
   }
 
-  if (updates.isNotEmpty) {
-    await _firestore.collection('leadPool').doc(leadId).update(updates);
+  /// Toggle boolean milestones and optionally attach proof URL(s).
+  Future<void> updateMilestones({
+    required String leadId,
+    bool? registrationDone,
+    bool? loanProcessDone,
+    bool? installationStarted,
+    String? proofUrl, // optional single proof; you can extend to a list
+    String? proofLabel,
+    String? byUid,
+    String? byName,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (registrationDone != null)
+      updates['registrationDone'] = registrationDone;
+    if (loanProcessDone != null) updates['loanProcessDone'] = loanProcessDone;
+    if (installationStarted != null)
+      updates['installationStarted'] = installationStarted;
+
+    // store proof as subcollection item for audit/history
+    if (proofUrl != null && proofUrl.isNotEmpty) {
+      final proofDoc = _firestore
+          .collection('leadPool')
+          .doc(leadId)
+          .collection('proofs')
+          .doc();
+      await _firestore.runTransaction((tx) async {
+        tx.update(_firestore.collection('leadPool').doc(leadId), updates);
+        tx.set(proofDoc, {
+          'url': proofUrl,
+          'label': proofLabel ?? 'Proof',
+          'uploadedByUid': byUid,
+          'uploadedByName': byName,
+          'createdAt': Timestamp.now(),
+        });
+      });
+      return;
+    }
+
+    if (updates.isNotEmpty) {
+      await _firestore.collection('leadPool').doc(leadId).update(updates);
+    }
   }
-}
 
-/// Streams
-Stream<List<LeadComment>> watchComments(String leadId) {
-  return _firestore
-      .collection('leadPool').doc(leadId)
-      .collection('comments')
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((s) => s.docs.map((d) => LeadComment.fromDoc(d)).toList());
-}
+  /// Streams
+  Stream<List<LeadComment>> watchComments(String leadId) {
+    return _firestore
+        .collection('leadPool')
+        .doc(leadId)
+        .collection('comments')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => LeadComment.fromDoc(d)).toList());
+  }
 
-Stream<List<LeadReminder>> watchReminders(String leadId) {
-  return _firestore
-      .collection('leadPool').doc(leadId)
-      .collection('reminders')
-      .orderBy('scheduledAt')
-      .snapshots()
-      .map((s) => s.docs.map((d) => LeadReminder.fromDoc(d)).toList());
-}
+  Stream<List<LeadReminder>> watchReminders(String leadId) {
+    return _firestore
+        .collection('leadPool')
+        .doc(leadId)
+        .collection('reminders')
+        .orderBy('scheduledAt')
+        .snapshots()
+        .map((s) => s.docs.map((d) => LeadReminder.fromDoc(d)).toList());
+  }
 
   /// Assign a sales officer to a lead and start Registration SLA (30 days)
   Future<void> assignSalesOfficer({
@@ -381,7 +393,7 @@ Stream<List<LeadReminder>> watchReminders(String leadId) {
     required String soName,
   }) async {
     final now = DateTime.now();
-    final registrationSlaEnd = now.add(const Duration(days: 30));
+    final registrationSlaEnd = now.add(const Duration(days: 3));
 
     await _firestore.collection('leadPool').doc(leadId).update({
       'assignedTo': soUid,
@@ -429,17 +441,19 @@ Stream<List<LeadReminder>> watchReminders(String leadId) {
       'status': 'registration_complete',
     });
   }
-// In LeadService class
-Future<void> completeInstallation(String leadId) async {
-  final now = DateTime.now();
 
-  await _firestore.collection('leadPool').doc(leadId).update({
-    'installationCompletedAt': Timestamp.fromDate(now),
-    'status': 'completed',  // Changed from 'installation_complete' to 'completed'
-    'closedAt': Timestamp.fromDate(now),  // Optional: add a closed timestamp
-    'isClosed': true,  // Optional: add a boolean flag for easier querying
-  });
-}
+// In LeadService class
+  Future<void> completeInstallation(String leadId) async {
+    final now = DateTime.now();
+
+    await _firestore.collection('leadPool').doc(leadId).update({
+      'installationCompletedAt': Timestamp.fromDate(now),
+      'status':
+          'completed', // Changed from 'installation_complete' to 'completed'
+      'closedAt': Timestamp.fromDate(now), // Optional: add a closed timestamp
+      'isClosed': true, // Optional: add a boolean flag for easier querying
+    });
+  }
 
   /// Get all leads with active breached SLAs
   Future<List<LeadPool>> getBreachedSlaLeads() async {
@@ -472,24 +486,25 @@ Future<void> completeInstallation(String leadId) async {
 
     return leads;
   }
+
 // in LeadService
-Future<void> assignInstallerAndStartSla({
-  required String leadId,
-  required String installerUid,
-  required String installerName,
-  int slaDays = 30,
-}) async {
-  final now = DateTime.now();
-  final end = now.add(Duration(days: slaDays));
-  await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
-    'installationAssignedTo': installerUid,
-    'installationAssignedToName': installerName,
-    'installationAssignedAt': Timestamp.fromDate(now),
-    'installationSlaStartDate': Timestamp.fromDate(now),
-    'installationSlaEndDate': Timestamp.fromDate(end),
-    'installationCompletedAt': null,
-  });
-}
+  Future<void> assignInstallerAndStartSla({
+    required String leadId,
+    required String installerUid,
+    required String installerName,
+    int slaDays = 30,
+  }) async {
+    final now = DateTime.now();
+    final end = now.add(Duration(days: slaDays));
+    await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
+      'installationAssignedTo': installerUid,
+      'installationAssignedToName': installerName,
+      'installationAssignedAt': Timestamp.fromDate(now),
+      'installationSlaStartDate': Timestamp.fromDate(now),
+      'installationSlaEndDate': Timestamp.fromDate(end),
+      'installationCompletedAt': null,
+    });
+  }
 
   // Get leads by location
   Stream<List<LeadPool>> getLeadsByLocation(String location) {
@@ -570,5 +585,4 @@ Future<void> assignInstallerAndStartSla({
       throw 'Failed to get statistics: ${e.toString()}';
     }
   }
-  
 }

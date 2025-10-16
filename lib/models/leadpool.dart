@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gosolarleads/models/offer.dart';
+import 'package:gosolarleads/models/operations_models.dart';
 import 'package:gosolarleads/models/survey_models.dart';
 import 'package:gosolarleads/models/installation_models.dart';
+import 'package:gosolarleads/models/accounts_models.dart';
 
 class LeadPool {
   final String uid;
@@ -41,75 +43,100 @@ class LeadPool {
   final DateTime? installationSlaEndDate;
   final DateTime? installationCompletedAt;
   final Installation? installation;
-final String? installationAssignedTo;
-final String? installationAssignedToName;
-final DateTime? installationAssignedAt;
+  final String? installationAssignedTo;
+  final String? installationAssignedToName;
+  final DateTime? installationAssignedAt;
+  final Operations? operations;
+final Accounts? accounts;
+
+final String? operationsAssignedTo;
+final String? operationsAssignedToName;
+final DateTime? operationsAssignedAt;
 
 
-
-  LeadPool({
-    required this.uid,
-    required this.name,
-    required this.email,
-    required this.number,
-    required this.address,
-    required this.location,
-    required this.state,
-    required this.electricityConsumption,
-    required this.powercut,
-    required this.additionalInfo,
-    required this.status,
-    required this.accountStatus,
-    required this.surveyStatus,
-    required this.createdBy,
-    required this.createdTime,
-    this.installationAssignedAt,
-    required this.date,
-    required this.incentive,
-    required this.pitchedAmount,
-    this.registrationSlaBreachReason,
-    this.registrationSlaBreachRecordedAt,
-    this.registrationSlaBreachRecordedBy,
-    this.installationSlaBreachReason,
-    this.installationSlaBreachRecordedAt,
-    this.installationSlaBreachRecordedBy,
-    this.offer,
-    this.survey, // Added survey
-    this.assignedTo,
-    this.assignedToName,
-    this.assignedAt,
-    this.groupId,
-    this.registrationSlaStartDate,
-    this.registrationSlaEndDate,
-    this.registrationCompletedAt,
-    this.installationSlaStartDate,
-    this.installationSlaEndDate,
-    this.installationCompletedAt,
-    this.installation,
-    this.installationAssignedTo,
-    this.installationAssignedToName
-  });
+  LeadPool(
+      {required this.uid,
+      required this.name,
+      required this.email,
+      required this.number,
+      required this.address,
+      required this.location,
+      required this.state,
+      required this.electricityConsumption,
+      required this.powercut,
+      required this.additionalInfo,
+      required this.status,
+      required this.accountStatus,
+      required this.surveyStatus,
+      required this.createdBy,
+      required this.createdTime,
+      this.installationAssignedAt,
+      this.accounts,
+      required this.date,
+      required this.incentive,
+      required this.pitchedAmount,
+      this.registrationSlaBreachReason,
+      this.registrationSlaBreachRecordedAt,
+      this.registrationSlaBreachRecordedBy,
+      this.installationSlaBreachReason,
+      this.installationSlaBreachRecordedAt,
+      this.installationSlaBreachRecordedBy,
+      this.offer,
+      this.survey, // Added survey
+      this.assignedTo,
+      this.assignedToName,
+      this.assignedAt,
+      this.groupId,
+      this.operations,
+      this.operationsAssignedAt,
+      this.operationsAssignedTo,
+      this.operationsAssignedToName,
+  
+      this.registrationSlaStartDate,
+      this.registrationSlaEndDate,
+      this.registrationCompletedAt,
+      this.installationSlaStartDate,
+      this.installationSlaEndDate,
+      this.installationCompletedAt,
+      this.installation,
+      this.installationAssignedTo,
+      this.installationAssignedToName});
 
   factory LeadPool.fromFirestore(DocumentSnapshot doc) {
     final data = (doc.data() as Map<String, dynamic>?) ?? {};
 
+    // Offer
     Offer? offerData;
     final rawOffer = data['offer'];
     if (rawOffer is Map<String, dynamic>) {
       offerData = Offer.fromMap(rawOffer);
     }
 
+    // Survey
     Survey? surveyData;
     final rawSurvey = data['survey'];
     if (rawSurvey is Map<String, dynamic>) {
       surveyData = Survey.fromMap(rawSurvey);
-    }// in fromFirestore:
-Installation? installationData;
-final rawInst = data['installation'];
-if (rawInst is Map<String, dynamic>) {
-  installationData = Installation.fromMap(rawInst);
-}
+    }
 
+    // Installation
+    Installation? installationData;
+    final rawInst = data['installation'];
+    if (rawInst is Map<String, dynamic>) {
+      installationData = Installation.fromMap(rawInst);
+    }
+Accounts? accountsData;
+final rawAcc = data['accounts'];
+if (rawAcc is Map<String, dynamic>) {
+  accountsData = Accounts.fromMap(rawAcc);
+}
+    // Helper to read DateTime from Timestamp
+    DateTime? _ts(dynamic v) => v is Timestamp ? v.toDate() : null;
+Operations? operationsData;
+final rawOps = data['operation'];
+if (rawOps is Map<String, dynamic>) {
+  operationsData = Operations.fromMap(rawOps);
+}
     return LeadPool(
       uid: (data['uid'] as String?)?.trim().isNotEmpty == true
           ? (data['uid'] as String).trim()
@@ -120,78 +147,100 @@ if (rawInst is Map<String, dynamic>) {
       address: (data['address'] ?? '') as String,
       location: (data['location'] ?? '') as String,
       state: (data['state'] ?? '') as String,
-      electricityConsumption: (data['electricityconsumption'] ?? '') as String,
+
+      // accept both keys just in case
+      electricityConsumption: (data['electricityConsumption'] ??
+          data['electricityconsumption'] ??
+          '') as String,
       powercut: (data['powercut'] ?? '') as String,
       additionalInfo: (data['additionalInfo'] ?? '') as String,
+
       status: (data['status'] ?? '') as String,
       accountStatus: (data['accountStatus'] ?? false) as bool,
       surveyStatus: (data['surveyStatus'] ?? false) as bool,
+
       createdBy: (data['createdBy'] ?? '') as String,
-      installation: installationData,
-installationAssignedTo: data['installationAssignedTo'] as String?,
-installationAssignedToName: data['installationAssignedToName'] as String?,
-installationAssignedAt: (data['installationAssignedAt'] as Timestamp?)?.toDate(),
-      createdTime: (data['createdTime'] is Timestamp)
-          ? (data['createdTime'] as Timestamp).toDate()
-          : DateTime.now(),
-      date: (data['date'] is Timestamp)
-          ? (data['date'] as Timestamp).toDate()
-          : DateTime.now(),
+      createdTime: _ts(data['createdTime']) ?? DateTime.now(),
+      date: _ts(data['date']) ?? DateTime.now(),
+
       incentive: (data['incentive'] ?? 0) as int,
       pitchedAmount: (data['pitchedAmount'] ?? 0) as int,
+accounts: accountsData,
       offer: offerData,
-      survey: surveyData, // Added survey
-      assignedTo: (data['assignedTo'] as String?),
-      assignedToName: (data['assignedToName'] as String?),
-      assignedAt: (data['assignedAt'] is Timestamp)
-          ? (data['assignedAt'] as Timestamp).toDate()
-          : null,
+      survey: surveyData,
+
+      assignedTo: data['assignedTo'] as String?,
+      assignedToName: data['assignedToName'] as String?,
+      assignedAt: _ts(data['assignedAt']),
+
       groupId: data['groupId'] as String?,
-      
-      registrationSlaBreachReason: data['registrationSlaBreachReason'] as String?,
-      registrationSlaBreachRecordedAt: data['registrationSlaBreachRecordedAt'] != null
-          ? (data['registrationSlaBreachRecordedAt'] as Timestamp).toDate()
-          : null,
-      registrationSlaBreachRecordedBy: data['registrationSlaBreachRecordedBy'] as String?,
-      installationSlaBreachReason: data['installationSlaBreachReason'] as String?,
-      installationSlaBreachRecordedAt: data['installationSlaBreachRecordedAt'] != null
-          ? (data['installationSlaBreachRecordedAt'] as Timestamp).toDate()
-          : null,
-      installationSlaBreachRecordedBy: data['installationSlaBreachRecordedBy'] as String?,
-      registrationSlaStartDate: (data['registrationSlaStartDate'] is Timestamp)
-          ? (data['registrationSlaStartDate'] as Timestamp).toDate()
-          : null,
-      registrationSlaEndDate: (data['registrationSlaEndDate'] is Timestamp)
-          ? (data['registrationSlaEndDate'] as Timestamp).toDate()
-          : null,
-      registrationCompletedAt: (data['registrationCompletedAt'] is Timestamp)
-          ? (data['registrationCompletedAt'] as Timestamp).toDate()
-          : null,
-      installationSlaStartDate: (data['installationSlaStartDate'] is Timestamp)
-          ? (data['installationSlaStartDate'] as Timestamp).toDate()
-          : null,
-      installationSlaEndDate: (data['installationSlaEndDate'] is Timestamp)
-          ? (data['installationSlaEndDate'] as Timestamp).toDate()
-          : null,
-      installationCompletedAt: (data['installationCompletedAt'] is Timestamp)
-          ? (data['installationCompletedAt'] as Timestamp).toDate()
-          : null,
+
+      // SLA breach meta
+      registrationSlaBreachReason:
+          data['registrationSlaBreachReason'] as String?,
+      registrationSlaBreachRecordedAt:
+          _ts(data['registrationSlaBreachRecordedAt']),
+      registrationSlaBreachRecordedBy:
+          data['registrationSlaBreachRecordedBy'] as String?,
+      installationSlaBreachReason:
+          data['installationSlaBreachReason'] as String?,
+      installationSlaBreachRecordedAt:
+          _ts(data['installationSlaBreachRecordedAt']),
+      installationSlaBreachRecordedBy:
+          data['installationSlaBreachRecordedBy'] as String?,
+
+      // SLA windows
+      registrationSlaStartDate: _ts(data['registrationSlaStartDate']),
+      registrationSlaEndDate: _ts(data['registrationSlaEndDate']),
+      registrationCompletedAt: _ts(data['registrationCompletedAt']),
+      installationSlaStartDate: _ts(data['installationSlaStartDate']),
+      installationSlaEndDate: _ts(data['installationSlaEndDate']),
+      installationCompletedAt: _ts(data['installationCompletedAt']),
+  operations: operationsData,
+  operationsAssignedTo: data['operationsAssignedTo'] as String?,
+  operationsAssignedToName: data['operationsAssignedToName'] as String?,
+  operationsAssignedAt: _ts(data['operationsAssignedAt']),
+      // Installation & assignment
+      installation: installationData,
+      installationAssignedTo: data['installationAssignedTo'] as String?,
+      installationAssignedToName: data['installationAssignedToName'] as String?,
+      installationAssignedAt: _ts(data['installationAssignedAt']),
     );
   }
 
   factory LeadPool.fromMap(Map<String, dynamic> map) {
+    // Offer
     Offer? offerData;
     final rawOffer = map['offer'];
     if (rawOffer is Map<String, dynamic>) {
       offerData = Offer.fromMap(rawOffer);
     }
 
+    // Survey
     Survey? surveyData;
     final rawSurvey = map['survey'];
     if (rawSurvey is Map<String, dynamic>) {
       surveyData = Survey.fromMap(rawSurvey);
     }
 
+    // Installation
+    Installation? installationData;
+    final rawInst = map['installation'];
+    if (rawInst is Map<String, dynamic>) {
+      installationData = Installation.fromMap(rawInst);
+    }
+Accounts? accountsData;
+final rawAcc = map['accounts'];
+if (rawAcc is Map<String, dynamic>) {
+  accountsData = Accounts.fromMap(rawAcc);
+}
+    DateTime? _ts(dynamic v) =>
+        v is Timestamp ? v.toDate() : (v is DateTime ? v : null);
+Operations? operationsData;
+final rawOps = map['operation'];
+if (rawOps is Map<String, dynamic>) {
+  operationsData = Operations.fromMap(rawOps);
+}
     return LeadPool(
       uid: (map['uid'] ?? '') as String,
       name: (map['name'] ?? '') as String,
@@ -200,51 +249,69 @@ installationAssignedAt: (data['installationAssignedAt'] as Timestamp?)?.toDate()
       address: (map['address'] ?? '') as String,
       location: (map['location'] ?? '') as String,
       state: (map['state'] ?? '') as String,
-      electricityConsumption: (map['electricityconsumption'] ?? '') as String,
+operations: operationsData,
+operationsAssignedTo: map['operationsAssignedTo'] as String?,
+operationsAssignedToName: map['operationsAssignedToName'] as String?,
+operationsAssignedAt: _ts(map['operationsAssignedAt']),
+      electricityConsumption: (map['electricityConsumption'] ??
+          map['electricityconsumption'] ??
+          '') as String,
       powercut: (map['powercut'] ?? '') as String,
       additionalInfo: (map['additionalInfo'] ?? '') as String,
+accounts: accountsData,
       status: (map['status'] ?? '') as String,
       accountStatus: (map['accountStatus'] ?? false) as bool,
       surveyStatus: (map['surveyStatus'] ?? false) as bool,
+
       createdBy: (map['createdBy'] ?? '') as String,
-      createdTime: (map['createdTime'] is Timestamp)
-          ? (map['createdTime'] as Timestamp).toDate()
-          : DateTime.now(),
-      date: (map['date'] is Timestamp)
-          ? (map['date'] as Timestamp).toDate()
-          : DateTime.now(),
+      createdTime: _ts(map['createdTime']) ?? DateTime.now(),
+      date: _ts(map['date']) ?? DateTime.now(),
+
       incentive: (map['incentive'] ?? 0) as int,
       pitchedAmount: (map['pitchedAmount'] ?? 0) as int,
+
       offer: offerData,
-      survey: surveyData, // Added survey
+      survey: surveyData,
+
       assignedTo: map['assignedTo'] as String?,
       assignedToName: map['assignedToName'] as String?,
-      assignedAt: (map['assignedAt'] is Timestamp)
-          ? (map['assignedAt'] as Timestamp).toDate()
-          : null,
+      assignedAt: _ts(map['assignedAt']),
+
       groupId: map['groupId'] as String?,
-      registrationSlaStartDate: (map['registrationSlaStartDate'] is Timestamp)
-          ? (map['registrationSlaStartDate'] as Timestamp).toDate()
-          : null,
-      registrationSlaEndDate: (map['registrationSlaEndDate'] is Timestamp)
-          ? (map['registrationSlaEndDate'] as Timestamp).toDate()
-          : null,
-      registrationCompletedAt: (map['registrationCompletedAt'] is Timestamp)
-          ? (map['registrationCompletedAt'] as Timestamp).toDate()
-          : null,
-      installationSlaStartDate: (map['installationSlaStartDate'] is Timestamp)
-          ? (map['installationSlaStartDate'] as Timestamp).toDate()
-          : null,
-      installationSlaEndDate: (map['installationSlaEndDate'] is Timestamp)
-          ? (map['installationSlaEndDate'] as Timestamp).toDate()
-          : null,
-      installationCompletedAt: (map['installationCompletedAt'] is Timestamp)
-          ? (map['installationCompletedAt'] as Timestamp).toDate()
-          : null,
+
+      // SLA breach meta
+      registrationSlaBreachReason:
+          map['registrationSlaBreachReason'] as String?,
+      registrationSlaBreachRecordedAt:
+          _ts(map['registrationSlaBreachRecordedAt']),
+      registrationSlaBreachRecordedBy:
+          map['registrationSlaBreachRecordedBy'] as String?,
+      installationSlaBreachReason:
+          map['installationSlaBreachReason'] as String?,
+      installationSlaBreachRecordedAt:
+          _ts(map['installationSlaBreachRecordedAt']),
+      installationSlaBreachRecordedBy:
+          map['installationSlaBreachRecordedBy'] as String?,
+
+      // SLA windows
+      registrationSlaStartDate: _ts(map['registrationSlaStartDate']),
+      registrationSlaEndDate: _ts(map['registrationSlaEndDate']),
+      registrationCompletedAt: _ts(map['registrationCompletedAt']),
+      installationSlaStartDate: _ts(map['installationSlaStartDate']),
+      installationSlaEndDate: _ts(map['installationSlaEndDate']),
+      installationCompletedAt: _ts(map['installationCompletedAt']),
+
+      // Installation & assignment
+      installation: installationData,
+      installationAssignedTo: map['installationAssignedTo'] as String?,
+      installationAssignedToName: map['installationAssignedToName'] as String?,
+      installationAssignedAt: _ts(map['installationAssignedAt']),
     );
   }
 
   Map<String, dynamic> toMap() {
+    Timestamp? _ts(DateTime? d) => d == null ? null : Timestamp.fromDate(d);
+
     return {
       'uid': uid,
       'name': name,
@@ -253,51 +320,58 @@ installationAssignedAt: (data['installationAssignedAt'] as Timestamp?)?.toDate()
       'address': address,
       'location': location,
       'state': state,
+'operations': operations?.toMap(),
+'operationsAssignedTo': operationsAssignedTo,
+'operationsAssignedToName': operationsAssignedToName,
+'operationsAssignedAt': _ts(operationsAssignedAt),
+'accounts': accounts?.toMap(),
+
+      // keep your existing key for compatibility
       'electricityconsumption': electricityConsumption,
       'powercut': powercut,
       'additionalInfo': additionalInfo,
+
       'status': status,
       'accountStatus': accountStatus,
       'surveyStatus': surveyStatus,
+
       'createdBy': createdBy,
-      'createdTime': Timestamp.fromDate(createdTime),
-      'date': Timestamp.fromDate(date),
+      'createdTime': _ts(createdTime),
+      'date': _ts(date),
+
       'incentive': incentive,
       'pitchedAmount': pitchedAmount,
+
       'offer': offer?.toMap(),
-      'survey': survey?.toMap(), // Added survey
+      'survey': survey?.toMap(),
+
       'assignedTo': assignedTo,
       'assignedToName': assignedToName,
-      'assignedAt': assignedAt != null ? Timestamp.fromDate(assignedAt!) : null,
+      'assignedAt': _ts(assignedAt),
+
       'groupId': groupId,
-      'registrationSlaStartDate': registrationSlaStartDate != null
-          ? Timestamp.fromDate(registrationSlaStartDate!)
-          : null,
-      'registrationSlaEndDate': registrationSlaEndDate != null
-          ? Timestamp.fromDate(registrationSlaEndDate!)
-          : null,
-      'registrationCompletedAt': registrationCompletedAt != null
-          ? Timestamp.fromDate(registrationCompletedAt!)
-          : null,
-          
+
+      // SLA breach meta
       'registrationSlaBreachReason': registrationSlaBreachReason,
-      'registrationSlaBreachRecordedAt': registrationSlaBreachRecordedAt,
+      'registrationSlaBreachRecordedAt': _ts(registrationSlaBreachRecordedAt),
       'registrationSlaBreachRecordedBy': registrationSlaBreachRecordedBy,
       'installationSlaBreachReason': installationSlaBreachReason,
-      'installationSlaBreachRecordedAt': installationSlaBreachRecordedAt,
+      'installationSlaBreachRecordedAt': _ts(installationSlaBreachRecordedAt),
       'installationSlaBreachRecordedBy': installationSlaBreachRecordedBy,
-      'installationSlaStartDate': installationSlaStartDate != null
-          ? Timestamp.fromDate(installationSlaStartDate!)
-          : null,
-      'installationSlaEndDate': installationSlaEndDate != null
-          ? Timestamp.fromDate(installationSlaEndDate!)
-          : null,
-      'installationCompletedAt': installationCompletedAt != null
-          ? Timestamp.fromDate(installationCompletedAt!)
-          : null,
-          'installation': installation?.toMap(),
-'installationAssignedTo': installationAssignedTo,
-'installationAssignedToName': installationAssignedToName,
+
+      // SLA windows
+      'registrationSlaStartDate': _ts(registrationSlaStartDate),
+      'registrationSlaEndDate': _ts(registrationSlaEndDate),
+      'registrationCompletedAt': _ts(registrationCompletedAt),
+      'installationSlaStartDate': _ts(installationSlaStartDate),
+      'installationSlaEndDate': _ts(installationSlaEndDate),
+      'installationCompletedAt': _ts(installationCompletedAt),
+
+      // Installation & assignment
+      'installation': installation?.toMap(),
+      'installationAssignedTo': installationAssignedTo,
+      'installationAssignedToName': installationAssignedToName,
+      'installationAssignedAt': _ts(installationAssignedAt),
     };
   }
 
@@ -321,23 +395,32 @@ installationAssignedAt: (data['installationAssignedAt'] as Timestamp?)?.toDate()
     int? incentive,
     int? pitchedAmount,
     Offer? offer,
-    Survey? survey, // Added survey
+    Survey? survey,
+    // SLA breach
+    Accounts? accounts,
     String? registrationSlaBreachReason,
     DateTime? registrationSlaBreachRecordedAt,
     String? registrationSlaBreachRecordedBy,
     String? installationSlaBreachReason,
     DateTime? installationSlaBreachRecordedAt,
     String? installationSlaBreachRecordedBy,
+    // assignment
     String? assignedTo,
     String? assignedToName,
     DateTime? assignedAt,
     String? groupId,
+    // SLA windows
     DateTime? registrationSlaStartDate,
     DateTime? registrationSlaEndDate,
     DateTime? registrationCompletedAt,
     DateTime? installationSlaStartDate,
     DateTime? installationSlaEndDate,
     DateTime? installationCompletedAt,
+    // installation object & assignment
+    Installation? installation,
+    String? installationAssignedTo,
+    String? installationAssignedToName,
+    DateTime? installationAssignedAt,
   }) {
     return LeadPool(
       uid: uid ?? this.uid,
@@ -347,13 +430,8 @@ installationAssignedAt: (data['installationAssignedAt'] as Timestamp?)?.toDate()
       address: address ?? this.address,
       location: location ?? this.location,
       state: state ?? this.state,
-      registrationSlaBreachReason: registrationSlaBreachReason ?? this.registrationSlaBreachReason,
-      registrationSlaBreachRecordedAt: registrationSlaBreachRecordedAt ?? this.registrationSlaBreachRecordedAt,
-      registrationSlaBreachRecordedBy: registrationSlaBreachRecordedBy ?? this.registrationSlaBreachRecordedBy,
-      installationSlaBreachReason: installationSlaBreachReason ?? this.installationSlaBreachReason,
-      installationSlaBreachRecordedAt: installationSlaBreachRecordedAt ?? this.installationSlaBreachRecordedAt,
-      installationSlaBreachRecordedBy: installationSlaBreachRecordedBy ?? this.installationSlaBreachRecordedBy,
-      electricityConsumption: electricityConsumption ?? this.electricityConsumption,
+      electricityConsumption:
+          electricityConsumption ?? this.electricityConsumption,
       powercut: powercut ?? this.powercut,
       additionalInfo: additionalInfo ?? this.additionalInfo,
       status: status ?? this.status,
@@ -365,24 +443,57 @@ installationAssignedAt: (data['installationAssignedAt'] as Timestamp?)?.toDate()
       incentive: incentive ?? this.incentive,
       pitchedAmount: pitchedAmount ?? this.pitchedAmount,
       offer: offer ?? this.offer,
-      survey: survey ?? this.survey, // Added survey
+      survey: survey ?? this.survey,
+accounts: accounts ?? this.accounts,
+      // SLA breach
+      registrationSlaBreachReason:
+          registrationSlaBreachReason ?? this.registrationSlaBreachReason,
+      registrationSlaBreachRecordedAt: registrationSlaBreachRecordedAt ??
+          this.registrationSlaBreachRecordedAt,
+      registrationSlaBreachRecordedBy: registrationSlaBreachRecordedBy ??
+          this.registrationSlaBreachRecordedBy,
+      installationSlaBreachReason:
+          installationSlaBreachReason ?? this.installationSlaBreachReason,
+      installationSlaBreachRecordedAt: installationSlaBreachRecordedAt ??
+          this.installationSlaBreachRecordedAt,
+      installationSlaBreachRecordedBy: installationSlaBreachRecordedBy ??
+          this.installationSlaBreachRecordedBy,
+
+      // assignment
       assignedTo: assignedTo ?? this.assignedTo,
       assignedToName: assignedToName ?? this.assignedToName,
       assignedAt: assignedAt ?? this.assignedAt,
       groupId: groupId ?? this.groupId,
-      registrationSlaStartDate: registrationSlaStartDate ?? this.registrationSlaStartDate,
-      registrationSlaEndDate: registrationSlaEndDate ?? this.registrationSlaEndDate,
-      registrationCompletedAt: registrationCompletedAt ?? this.registrationCompletedAt,
-      installationSlaStartDate: installationSlaStartDate ?? this.installationSlaStartDate,
-      installationSlaEndDate: installationSlaEndDate ?? this.installationSlaEndDate,
-      installationCompletedAt: installationCompletedAt ?? this.installationCompletedAt,
+
+      // SLA windows
+      registrationSlaStartDate:
+          registrationSlaStartDate ?? this.registrationSlaStartDate,
+      registrationSlaEndDate:
+          registrationSlaEndDate ?? this.registrationSlaEndDate,
+      registrationCompletedAt:
+          registrationCompletedAt ?? this.registrationCompletedAt,
+      installationSlaStartDate:
+          installationSlaStartDate ?? this.installationSlaStartDate,
+      installationSlaEndDate:
+          installationSlaEndDate ?? this.installationSlaEndDate,
+      installationCompletedAt:
+          installationCompletedAt ?? this.installationCompletedAt,
+
+      // installation object & assignment
+      installation: installation ?? this.installation,
+      installationAssignedTo:
+          installationAssignedTo ?? this.installationAssignedTo,
+      installationAssignedToName:
+          installationAssignedToName ?? this.installationAssignedToName,
+      installationAssignedAt:
+          installationAssignedAt ?? this.installationAssignedAt,
     );
   }
 
   // Helper getters
   bool get hasOffer => offer != null;
   bool get hasSurvey => survey != null; // Added survey helper
-bool get hasInstaller => (installationAssignedTo?.isNotEmpty ?? false);
+  bool get hasInstaller => (installationAssignedTo?.isNotEmpty ?? false);
 
   String get _statusLc => status.trim().toLowerCase();
 
@@ -400,9 +511,8 @@ bool get hasInstaller => (installationAssignedTo?.isNotEmpty ?? false);
   bool get isUnassigned => !isAssigned;
 
   String get fullAddress {
-    final parts = [address, location, state]
-        .where((e) => e.trim().isNotEmpty)
-        .toList();
+    final parts =
+        [address, location, state].where((e) => e.trim().isNotEmpty).toList();
     return parts.join(', ');
   }
 

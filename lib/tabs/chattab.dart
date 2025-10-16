@@ -22,7 +22,6 @@ class ChatTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 👇 show ALL groups
     final groupsAsync = ref.watch(allChatGroupsProvider);
     final user = ref.watch(currentUserProvider).value;
     return Scaffold(
@@ -72,7 +71,10 @@ class ChatTab extends ConsumerWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                    ),
                     label: const Text('Create Group'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryBlue,
@@ -275,7 +277,10 @@ class ChatTab extends ConsumerWidget {
                 );
               },
               backgroundColor: AppTheme.primaryBlue,
-              child: const Icon(Icons.add),
+              child: const Icon(
+                Icons.add,
+                color: Colors.white,
+              ),
             )
           : SizedBox(),
     );

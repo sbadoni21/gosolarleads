@@ -27,6 +27,11 @@ class CallRecordingButton extends ConsumerStatefulWidget {
 class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
   final _recordingService = LocalCallRecordingService();
   bool _isInitialized = false;
+  bool _disposed = false;
+
+  void safeSetState(VoidCallback fn) {
+    if (mounted && !_disposed) setState(fn);
+  }
 
   @override
   void initState() {
@@ -34,9 +39,18 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
     _initializeService();
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    // Cancel any callbacks/streams in your service if available
+    // _recordingService.dispose();
+    super.dispose();
+  }
+
   Future<void> _initializeService() async {
     final success = await _recordingService.initialize();
-    setState(() => _isInitialized = success);
+    if (!mounted) return;
+    safeSetState(() => _isInitialized = success);
   }
 
   Future<void> _startCall() async {
@@ -51,12 +65,11 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
       return;
     }
 
-    // Show consent dialog
+    if (!mounted) return;
     final consent = await _showConsentDialog();
-    if (consent != true) return;
+    if (!mounted || consent != true) return;
 
     try {
-      // Start recording
       final callId = await _recordingService.startRecording(
         leadId: widget.leadId,
         leadName: widget.leadName,
@@ -65,27 +78,32 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
         salesOfficerName: user.name ?? 'Unknown',
       );
 
-      if (callId != null) {
-        // Make the phone call
-        final uri = Uri.parse('tel:${widget.phoneNumber}');
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
+      if (!mounted) return;
 
-          // Show recording indicator
+      if (callId != null) {
+        final uri = Uri.parse('tel:${widget.phoneNumber}');
+        final canCall = await canLaunchUrl(uri);
+        if (!mounted) return;
+
+        if (canCall) {
+          await launchUrl(uri);
+          if (!mounted) return;
           _showRecordingDialog();
         } else {
-          _recordingService.cancelRecording();
+          await _recordingService.cancelRecording();
           _showSnackbar('Cannot make phone call', isError: true);
         }
       } else {
         _showSnackbar('Failed to start recording', isError: true);
       }
     } catch (e) {
+      if (!mounted) return;
       _showSnackbar('Error: $e', isError: true);
     }
   }
 
   Future<bool?> _showConsentDialog() {
+    if (!mounted) return Future.value(false);
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -171,6 +189,7 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
   }
 
   void _showRecordingDialog() {
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -207,8 +226,10 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () async {
+                      if (!mounted) return;
                       Navigator.pop(ctx);
                       await _recordingService.cancelRecording();
+                      if (!mounted) return;
                       _showSnackbar('Recording cancelled');
                     },
                     style: OutlinedButton.styleFrom(
@@ -225,6 +246,7 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
+                      if (!mounted) return;
                       Navigator.pop(ctx);
                       await _endCall();
                     },
@@ -247,7 +269,9 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
   }
 
   Future<void> _endCall() async {
-    // Show uploading indicator
+    if (!mounted) return;
+
+    // Uploading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -270,20 +294,23 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
 
     final success = await _recordingService.stopRecordingAndUpload();
 
-    if (mounted) {
-      Navigator.pop(context); // Close uploading dialog
+    if (!mounted) return;
 
-      if (success) {
-        _showSnackbar('✅ Call recording uploaded successfully',
-            isSuccess: true);
-      } else {
-        _showSnackbar('❌ Failed to upload recording', isError: true);
-      }
-    }
+    // Close uploading dialog
+    Navigator.of(context, rootNavigator: true).pop();
+
+    _showSnackbar(
+      success
+          ? '✅ Call recording uploaded successfully'
+          : '❌ Failed to upload recording',
+      isSuccess: success,
+      isError: !success,
+    );
   }
 
   void _showSnackbar(String message,
       {bool isError = false, bool isSuccess = false}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -310,7 +337,7 @@ class _CallRecordingButtonState extends ConsumerState<CallRecordingButton> {
       label: Text(
           _recordingService.isRecording ? 'Recording...' : 'Call & Record'),
       style: ElevatedButton.styleFrom(
-        textStyle: TextStyle(fontSize: 12),
+        textStyle: const TextStyle(fontSize: 12),
         backgroundColor: _recordingService.isRecording
             ? AppTheme.errorRed
             : AppTheme.successGreen,
@@ -513,7 +540,9 @@ class CallHistoryList extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    DateFormat('dd MMM yyyy').format(call.startedAt!),
+                    call.startedAt != null
+                        ? DateFormat('dd MMM yyyy').format(call.startedAt!)
+                        : '',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.mediumGrey,
@@ -525,11 +554,7 @@ class CallHistoryList extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () {
-                // Use audioplayers package to play
-                // final player = AudioPlayer();
-                // player.play(UrlSource(call.recordingUrl!));
-
-                // For now, open in browser
+                if (call.recordingUrl == null) return;
                 launchUrl(Uri.parse(call.recordingUrl!));
               },
               icon: const Icon(Icons.play_arrow),
@@ -556,57 +581,3 @@ class CallHistoryList extends StatelessWidget {
     );
   }
 }
-
-// ============================================
-// INTEGRATION: Add to Sales Lead Screen
-// ============================================
-// 
-// In your sales_lead_screen.dart, add this section:
-
-/*
-Widget _buildCallSection(LeadPool lead) {
-  return Card(
-    elevation: 2,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle('Contact & Record', Icons.phone_in_talk),
-          const SizedBox(height: 16),
-          
-          // Call button with recording
-          CallRecordingButton(
-            leadId: lead.uid,
-            leadName: lead.name,
-            phoneNumber: lead.number,
-          ),
-          
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 16),
-          
-          // Call history
-          Row(
-            children: [
-              const Icon(Icons.history, size: 18, color: AppTheme.mediumGrey),
-              const SizedBox(width: 8),
-              const Text(
-                'Call History',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          CallHistoryList(leadId: lead.uid),
-        ],
-      ),
-    ),
-  );
-}
-*/

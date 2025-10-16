@@ -150,9 +150,9 @@ class SurveyService {
     try {
       await _firestore.collection('leadPool').doc(leadId).update({
         'survey.assignTo': surveyorEmail,
-        'assignedTo': surveyorEmail,
-        'assignedToName': surveyorName,
-        'assignedAt': FieldValue.serverTimestamp(),
+        'survey.assignedTo': surveyorEmail,
+        'survey.assignedToName': surveyorName,
+        'survey.assignedAt': FieldValue.serverTimestamp(),
       });
 
       // TODO: Send notification to surveyor

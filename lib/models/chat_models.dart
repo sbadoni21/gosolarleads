@@ -49,12 +49,22 @@ class ChatMember {
   }
 }
 
+// lib/models/chat_models.dart  (only the ChatGroup parts shown)
+
 class ChatGroup {
   final String id;
   final String name;
   final String description;
-  final String workLocation;
+
+  /// NEW: multiple districts
+  final List<String> districts;
+
+  /// keep state as single (you can upsize later if needed)
   final String state;
+
+  /// DEPRECATED: keep reading & writing for compatibility
+  final String workLocation;
+
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -67,8 +77,9 @@ class ChatGroup {
     required this.id,
     required this.name,
     required this.description,
-    required this.workLocation,
+    required this.districts,
     required this.state,
+    required this.workLocation, // legacy single location
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -79,28 +90,42 @@ class ChatGroup {
   });
 
   factory ChatGroup.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final data = (doc.data() as Map<String, dynamic>? ?? {});
 
-    List<ChatMember> membersList = [];
-    if (data['members'] != null) {
-      membersList = (data['members'] as List)
-          .map((member) => ChatMember.fromMap(member as Map<String, dynamic>))
-          .toList();
-    }
+    // members
+    final membersList = (data['members'] as List? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(ChatMember.fromMap)
+        .toList();
+
+    // districts (new) with fallback to legacy 'workLocation'
+    final List<String> districts = (data['districts'] as List?)
+            ?.whereType<String>()
+            .toList() ??
+        (data['workLocation'] != null && (data['workLocation'] as String).trim().isNotEmpty
+            ? <String>[(data['workLocation'] as String).trim()]
+            : <String>[]);
 
     return ChatGroup(
       id: doc.id,
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      workLocation: data['workLocation'] ?? '',
-      state: data['state'] ?? '',
-      createdBy: data['createdBy'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      name: (data['name'] ?? '').toString(),
+      description: (data['description'] ?? '').toString(),
+      districts: districts,
+      state: (data['state'] ?? '').toString(),
+      workLocation: (data['workLocation'] ?? '').toString(), // keep it
+      createdBy: (data['createdBy'] ?? '').toString(),
+      createdAt: (data['createdAt'] is Timestamp)
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      updatedAt: (data['updatedAt'] is Timestamp)
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : DateTime.now(),
       members: membersList,
-      lastMessage: data['lastMessage'],
-      lastMessageTime: (data['lastMessageTime'] as Timestamp?)?.toDate(),
-      groupIcon: data['groupIcon'],
+      lastMessage: data['lastMessage'] as String?,
+      lastMessageTime: (data['lastMessageTime'] is Timestamp)
+          ? (data['lastMessageTime'] as Timestamp).toDate()
+          : null,
+      groupIcon: data['groupIcon'] as String?,
     );
   }
 
@@ -108,15 +133,18 @@ class ChatGroup {
     return {
       'name': name,
       'description': description,
-      'workLocation': workLocation,
+
+      // write both for compatibility
+      'districts': districts,
+      'workLocation': districts.isNotEmpty ? districts.first : workLocation,
+
       'state': state,
       'createdBy': createdBy,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
-      'members': members.map((member) => member.toMap()).toList(),
+      'members': members.map((m) => m.toMap()).toList(),
       'lastMessage': lastMessage,
-      'lastMessageTime':
-          lastMessageTime != null ? Timestamp.fromDate(lastMessageTime!) : null,
+      'lastMessageTime': lastMessageTime != null ? Timestamp.fromDate(lastMessageTime!) : null,
       'groupIcon': groupIcon,
     };
   }
@@ -125,8 +153,9 @@ class ChatGroup {
     String? id,
     String? name,
     String? description,
-    String? workLocation,
+    List<String>? districts,
     String? state,
+    String? workLocation,
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -139,8 +168,9 @@ class ChatGroup {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      workLocation: workLocation ?? this.workLocation,
+      districts: districts ?? this.districts,
       state: state ?? this.state,
+      workLocation: workLocation ?? this.workLocation,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -152,7 +182,14 @@ class ChatGroup {
   }
 
   int get memberCount => members.length;
-  String get locationDisplay => '$workLocation, $state';
+
+  /// show “District1, District2 – State”
+  String get locationDisplay {
+    final d = districts.where((e) => e.trim().isNotEmpty).toList();
+    final left = d.isEmpty ? (workLocation.isNotEmpty ? workLocation : '-') : d.join(', ');
+    final s = state.trim().isEmpty ? '-' : state;
+    return '$left, $s';
+  }
 }
 
 class ChatMessage {

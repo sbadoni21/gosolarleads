@@ -51,7 +51,6 @@ dependencies:
   url_launcher: 
   chewie:
   flutter_local_notifications:
-  
   # File Picking
   image_picker: 
   file_picker: 

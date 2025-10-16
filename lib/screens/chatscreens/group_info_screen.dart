@@ -19,7 +19,7 @@ class GroupInfoScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allLeadsAsync = ref.watch(allLeadsProvider);
     final currentUser = ref.watch(currentUserProvider).value;
-    
+
     // Watch the specific group for real-time updates
     final groupAsync = ref.watch(specificGroupProvider(group.id));
 
@@ -40,10 +40,12 @@ class GroupInfoScreen extends ConsumerWidget {
           return allLeadsAsync.when(
             data: (allLeads) {
               // Filter leads for this group
-              final groupLeads =
-                  allLeads.where((lead) => lead.groupId == currentGroup.id).toList();
+              final groupLeads = allLeads
+                  .where((lead) => lead.groupId == currentGroup.id)
+                  .toList();
 
-              return _buildContent(context, ref, groupLeads, currentUser, currentGroup);
+              return _buildContent(
+                  context, ref, groupLeads, currentUser, currentGroup);
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, stack) => Center(
@@ -301,7 +303,7 @@ class GroupInfoScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Divider(color: Colors.white.withOpacity(0.3)),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
             children: [
               _buildInfoChip(
                 Icons.location_on,
@@ -309,12 +311,15 @@ class GroupInfoScreen extends ConsumerWidget {
                 Colors.white,
               ),
               const SizedBox(width: 12),
-              _buildInfoChip(
-                Icons.people,
-                '${currentGroup.memberCount} members',
-                Colors.white,
-              ),
             ],
+          ),
+          SizedBox(
+            height: 10,
+          ),
+          _buildInfoChip(
+            Icons.people,
+            '${currentGroup.memberCount} members',
+            Colors.white,
           ),
         ],
       ),
@@ -336,7 +341,7 @@ class GroupInfoScreen extends ConsumerWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 8,
               color: color,
               fontWeight: FontWeight.w500,
             ),
@@ -813,8 +818,8 @@ class GroupInfoScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMembersCard(
-      BuildContext context, WidgetRef ref, dynamic currentUser, ChatGroup currentGroup) {
+  Widget _buildMembersCard(BuildContext context, WidgetRef ref,
+      dynamic currentUser, ChatGroup currentGroup) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -931,8 +936,8 @@ class GroupInfoScreen extends ConsumerWidget {
                             iconSize: 20,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
-                            onPressed: () =>
-                                _showRemoveMemberDialog(context, ref, member, currentGroup),
+                            onPressed: () => _showRemoveMemberDialog(
+                                context, ref, member, currentGroup),
                           ),
                         ],
                       ],
@@ -963,8 +968,8 @@ class GroupInfoScreen extends ConsumerWidget {
     return null;
   }
 
-  void _showRemoveMemberDialog(
-      BuildContext context, WidgetRef ref, ChatMember member, ChatGroup currentGroup) {
+  void _showRemoveMemberDialog(BuildContext context, WidgetRef ref,
+      ChatMember member, ChatGroup currentGroup) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -990,8 +995,8 @@ class GroupInfoScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _removeMember(
-      BuildContext context, WidgetRef ref, ChatMember member, ChatGroup currentGroup) async {
+  Future<void> _removeMember(BuildContext context, WidgetRef ref,
+      ChatMember member, ChatGroup currentGroup) async {
     try {
       // Show loading indicator
       showDialog(
@@ -1176,7 +1181,8 @@ class GroupInfoScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildAddMember(BuildContext context, WidgetRef ref, ChatGroup currentGroup) {
+  Widget _buildAddMember(
+      BuildContext context, WidgetRef ref, ChatGroup currentGroup) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
       child: ElevatedButton(
@@ -1198,7 +1204,8 @@ class GroupInfoScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddMemberDialog(BuildContext context, WidgetRef ref, ChatGroup currentGroup) {
+  void _showAddMemberDialog(
+      BuildContext context, WidgetRef ref, ChatGroup currentGroup) {
     showDialog(
       context: context,
       builder: (context) => AddMemberDialog(
