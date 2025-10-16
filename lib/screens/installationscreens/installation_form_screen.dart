@@ -1,10 +1,15 @@
+// lib/screens/installation_form_screen.dart
+
 import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:gosolarleads/models/installation_models.dart';
 import 'package:gosolarleads/providers/installation_provider.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'package:gosolarleads/models/installation_models.dart';
 import 'package:gosolarleads/providers/auth_provider.dart';
 
 class InstallationFormScreen extends ConsumerStatefulWidget {
@@ -24,10 +29,12 @@ class InstallationFormScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<InstallationFormScreen> createState() => _InstallationFormScreenState();
+  ConsumerState<InstallationFormScreen> createState() =>
+      _InstallationFormScreenState();
 }
 
-class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen> {
+class _InstallationFormScreenState
+    extends ConsumerState<InstallationFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _picker = ImagePicker();
   bool _busy = false;
@@ -38,7 +45,7 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
   late final TextEditingController _location;
   late final TextEditingController _installerName;
 
-  // display label per image key
+  // Display labels
   final Map<String, String> _labels = const {
     'structureImage': 'Structure',
     'wiringACImage': 'Wiring (AC)',
@@ -58,7 +65,7 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
     'dampProofSprinklerImage': 'Damp Proof/Sprinkler',
   };
 
-  // local images picked (take precedence over urls)
+  // Local selections
   final Map<String, File?> _localFiles = {
     'structureImage': null,
     'wiringACImage': null,
@@ -78,23 +85,45 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
     'dampProofSprinklerImage': null,
   };
 
-  // existing urls from backend (shown if no local file picked for that key)
+  // Original XFile (to read bytes if File path is fake)
+  final Map<String, XFile?> _localX = {
+    'structureImage': null,
+    'wiringACImage': null,
+    'wiringDCImage': null,
+    'inverterImage': null,
+    'batteryImage': null,
+    'acdbImage': null,
+    'dcdbImage': null,
+    'earthingImage': null,
+    'panelsImage': null,
+    'civilImage': null,
+    'civilLegImage': null,
+    'civilEarthingImage': null,
+    'inverterOnImage': null,
+    'appInstallImage': null,
+    'plantInspectionImage': null,
+    'dampProofSprinklerImage': null,
+  };
+
+  // URLs from backend or after instant upload
   late Map<String, String?> _urls;
 
-  // tile-level progress (0..1)
+  // per-tile progress (0..1) ; -1 hides
   final Map<String, double> _progress = {};
 
-  // status
+  // draft | submitted
   String _status = 'draft';
 
   @override
   void initState() {
     super.initState();
     final user = ref.read(currentUserProvider).value;
-    _clientName    = TextEditingController(text: widget.leadName);
-    _contact       = TextEditingController(text: widget.leadContact);
-    _location      = TextEditingController(text: widget.leadLocation);
-    _installerName = TextEditingController(text: user?.name ?? user?.email ?? 'Installer');
+
+    _clientName = TextEditingController(text: widget.leadName);
+    _contact = TextEditingController(text: widget.leadContact);
+    _location = TextEditingController(text: widget.leadLocation);
+    _installerName =
+        TextEditingController(text: user?.name ?? user?.email ?? 'Installer');
 
     _urls = {
       'structureImage': widget.existing?.structureImage,
@@ -127,28 +156,115 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
     super.dispose();
   }
 
+  // ————————————————— Instant upload helpers —————————————————
+
+  Future<void> _uploadPickedImage(String key) async {
+    final svc = ref.read(installationServiceProvider);
+    final xf = _localX[key];
+    final file = _localFiles[key];
+
+    if (xf == null && file == null) return;
+
+    setState(() => _progress[key] = 0.0);
+
+    try {
+      String url;
+
+      try {
+        // Smart upload first (uses putFile if path exists; else putData)
+        if (file != null) {
+          url = await svc.uploadImageSmart(
+            file: file,
+            leadId: widget.leadId,
+            fieldName: key,
+            onProgress: (p) {
+              if (!mounted) return;
+              setState(() => _progress[key] = p);
+            },
+          );
+        } else {
+          // XFile only
+          final bytes = await xf!.readAsBytes();
+          url = await svc.uploadImageBytes(
+            bytes: bytes,
+            leadId: widget.leadId,
+            fieldName: key,
+            onProgress: (p) {
+              if (!mounted) return;
+              setState(() => _progress[key] = p);
+            },
+          );
+        }
+      } catch (inner) {
+        debugPrint(
+            'uploadImageSmart failed for $key, retrying as bytes: $inner');
+        // Extra-safe fallback: force bytes path from XFile
+        final bytes = await (xf ?? _localX[key])!.readAsBytes();
+        url = await svc.uploadImageBytes(
+          bytes: bytes,
+          leadId: widget.leadId,
+          fieldName: key,
+          onProgress: (p) {
+            if (!mounted) return;
+            setState(() => _progress[key] = p);
+          },
+        );
+      }
+
+      // Persist URL immediately so others can see it
+      await svc.updateImageField(
+        leadId: widget.leadId,
+        fieldName: key,
+        url: url,
+      );
+      debugPrint('✔ $key uploaded: $url');
+
+      if (!mounted) return;
+      setState(() {
+        _urls[key] = url; // switch UI to network image
+        _localFiles[key] = null; // clear local temp
+        _localX[key] = null;
+        _progress[key] = 1.0; // done
+      });
+    } catch (e) {
+      debugPrint('✖ Instant upload failed for $key: $e');
+      if (!mounted) return;
+      setState(() => _progress.remove(key));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload ${_labels[key] ?? key}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _pick(String key) async {
     final source = await showModalBottomSheet<ImageSource?>(
       context: context,
-      builder: (_) => _PickSourceSheet(),
+      builder: (_) => const _PickSourceSheet(),
     );
     if (source == null) return;
 
     final x = await _picker.pickImage(source: source, imageQuality: 80);
     if (x == null) return;
 
+    // Optimistic preview
     setState(() {
-      _localFiles[key] = File(x.path);
-      _urls[key] = null;               // override existing url
-      _progress[key] = 0.0;            // show progress baseline
+      _localX[key] = x;
+      _localFiles[key] = File(x.path); // may be fake for content://
+      _urls[key] = null;
+      _progress[key] = 0.0;
     });
+
+    await _uploadPickedImage(key);
   }
 
   void _remove(String key) {
     setState(() {
       _localFiles[key] = null;
-      // don’t erase server url automatically; leave as-is unless user explicitly clears
-      // if you want a hard remove, uncomment:
+      _localX[key] = null;
+      // keep server URL unless you want a hard remove:
       // _urls[key] = null;
       _progress.remove(key);
     });
@@ -162,10 +278,11 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
     return count;
   }
 
+  // ————————————————— Save (no image uploads here) —————————————————
+
   Future<void> _save(String status) async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Submit guard: ask to confirm if fewer than 6 images attached (tweak threshold)
     if (status == 'submitted' && _attachedCount < 6) {
       final ok = await showDialog<bool>(
         context: context,
@@ -175,8 +292,14 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
             'Some recommended photos are missing. You can still submit now or save as draft and complete later.',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Submit Anyway')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Submit Anyway'),
+            ),
           ],
         ),
       );
@@ -184,6 +307,7 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
     }
 
     setState(() => _busy = true);
+
     try {
       final installation = Installation(
         clientName: _clientName.text,
@@ -210,25 +334,13 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
         dampProofSprinklerImage: _urls['dampProofSprinklerImage'],
       );
 
-      // the service can update URLs after upload; if you want live per-tile progress, you can expose a callback
-      await ref.read(installationServiceProvider).saveInstallation(
-        leadId: widget.leadId,
-        installation: installation,
-        files: _localFiles,
-        onProgress: (key, percent) {
-          setState(() => _progress[key] = percent);
-        },
-        onFileUploaded: (key, downloadUrl) {
-          // reflect new URL immediately in UI
-          setState(() {
-            _urls[key] = downloadUrl;
-            _localFiles[key] = null; // clear temp file after upload if you like
-            _progress[key] = 1.0;
-          });
-        },
-      );
+      // Final merge (service strips nulls to avoid overwriting existing URLs)
+      await ref.read(installationServiceProvider).saveInstallationData(
+            leadId: widget.leadId,
+            installation: installation,
+          );
 
-      // notify on submitted
+      // Optional notification on submit
       if (status == 'submitted') {
         try {
           final user = ref.read(currentUserProvider).value;
@@ -245,9 +357,15 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
       }
 
       if (!mounted) return;
+      setState(() {
+        _status = status;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(status == 'submitted' ? 'Installation submitted' : 'Saved as draft'),
+          content: Text(status == 'submitted'
+              ? 'Installation submitted'
+              : 'Saved as draft'),
         ),
       );
       Navigator.pop(context, true);
@@ -261,8 +379,15 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
     }
   }
 
+  // ————————————————— UI —————————————————
+
   @override
   Widget build(BuildContext context) {
+    // live Firestore re-hydration
+    final instStream = ref
+        .read(installationServiceProvider)
+        .watchInstallationMap(widget.leadId);
+
     final total = _localFiles.length;
 
     return Scaffold(
@@ -276,20 +401,24 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)
+            ],
           ),
           child: Row(
             children: [
-              // progress chip
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.blue.withOpacity(0.2)),
                 ),
                 child: Text('Photos: $_attachedCount / $total',
-                    style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600)),
+                    style: TextStyle(
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.w600)),
               ),
               const Spacer(),
               OutlinedButton(
@@ -301,85 +430,112 @@ class _InstallationFormScreenState extends ConsumerState<InstallationFormScreen>
                 onPressed: _busy ? null : () => _save('submitted'),
                 child: _busy
                     ? const SizedBox(
-                        width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : const Text('Submit'),
               ),
             ],
           ),
         ),
       ),
-      body: _busy
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: _LeadSummaryCard(
-                        clientName: _clientName.text,
-                        contact: _contact.text,
-                        location: _location.text,
-                        installerName: _installerName.text,
-                        status: _status,
-                      ),
+      body: StreamBuilder<Map<String, dynamic>?>(
+        stream: instStream,
+        builder: (context, snap) {
+          if (_busy) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Rehydrate URLs/status from Firestore when data arrives
+          final latest = snap.data;
+          if (latest != null) {
+            for (final k in _urls.keys) {
+              final v = latest[k];
+              if (v is String && v.isNotEmpty) {
+                _urls[k] = v;
+              }
+            }
+            if (latest['status'] is String) {
+              _status = latest['status'] as String;
+            }
+          }
+
+          return Form(
+            key: _formKey,
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: _LeadSummaryCard(
+                      clientName: _clientName.text,
+                      contact: _contact.text,
+                      location: _location.text,
+                      installerName: _installerName.text,
+                      status: _status,
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: _SectionHeader(
-                      title: 'Photo Checklist',
-                      subtitle: 'Upload clear photos for faster approvals.',
-                      icon: Icons.photo_library_outlined,
-                    ),
+                ),
+                const SliverToBoxAdapter(
+                  child: _SectionHeader(
+                    title: 'Photo Checklist',
+                    subtitle: 'Upload clear photos for faster approvals.',
+                    icon: Icons.photo_library_outlined,
                   ),
-                  // grid of tiles
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.15,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final key = _localFiles.keys.elementAt(index);
-                          return _ImageTile(
-                            label: _labels[key] ?? key,
-                            file: _localFiles[key],
-                            url: _urls[key],
-                            progress: _progress[key] ?? -1, // -1 = hidden
-                            onPick: () => _pick(key),
-                            onRemove: () => _remove(key),
-                            onPreview: () {
-                              final imageProvider = _localFiles[key] != null
-                                  ? Image.file(_localFiles[key]!).image
-                                  : (_urls[key]?.isNotEmpty ?? false)
-                                      ? Image.network(_urls[key]!).image
-                                      : null;
-                              if (imageProvider != null) {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => Dialog(
-                                    child: InteractiveViewer(
-                                      child: Image(image: imageProvider, fit: BoxFit.contain),
+                ),
+                SliverPadding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.15,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final key = _localFiles.keys.elementAt(index);
+                        return _ImageTile(
+                          label: _labels[key] ?? key,
+                          file: _localFiles[key],
+                          url: _urls[key],
+                          progress: _progress[key] ?? -1, // -1 = hidden
+                          onPick: () => _pick(key),
+                          onRemove: () => _remove(key),
+                          onPreview: () {
+                            final imageProvider = _localFiles[key] != null
+                                ? Image.file(_localFiles[key]!).image
+                                : (_urls[key]?.isNotEmpty ?? false)
+                                    ? Image.network(_urls[key]!).image
+                                    : null;
+                            if (imageProvider != null) {
+                              showDialog(
+                                context: context,
+                                builder: (_) => Dialog(
+                                  child: InteractiveViewer(
+                                    child: Image(
+                                      image: imageProvider,
+                                      fit: BoxFit.contain,
                                     ),
                                   ),
-                                );
-                              }
-                            },
-                          );
-                        },
-                        childCount: _localFiles.length,
-                      ),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                      childCount: _localFiles.length,
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
-                ],
-              ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
+              ],
             ),
+          );
+        },
+      ),
     );
   }
 }
@@ -413,9 +569,12 @@ class _SectionHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+                Text(subtitle,
+                    style:
+                        TextStyle(color: Colors.grey.shade700, fontSize: 12)),
               ],
             ),
           ),
@@ -460,13 +619,15 @@ class _LeadSummaryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   clientName.isEmpty ? 'Unnamed Lead' : clientName,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
@@ -474,7 +635,10 @@ class _LeadSummaryCard extends StatelessWidget {
                 ),
                 child: Text(
                   status == 'submitted' ? 'Submitted' : 'Draft',
-                  style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 12),
+                  style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12),
                 ),
               ),
             ],
@@ -527,7 +691,7 @@ class _ImageTile extends StatelessWidget {
   final String label;
   final File? file;
   final String? url;
-  final double progress; // -1 hides progress
+  final double progress; // -1 hides
   final VoidCallback onPick;
   final VoidCallback onRemove;
   final VoidCallback onPreview;
@@ -555,13 +719,14 @@ class _ImageTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: hasContent ? Colors.green.shade200 : Colors.grey.shade200),
+            border: Border.all(
+                color:
+                    hasContent ? Colors.green.shade200 : Colors.grey.shade200),
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.all(10),
           child: Column(
             children: [
-              // Thumbnail
               Expanded(
                 child: Stack(
                   children: [
@@ -574,15 +739,16 @@ class _ImageTile extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                         child: hasContent
                             ? (file != null
-                                ? Image.file(file!, fit: BoxFit.cover, width: double.infinity)
-                                : Image.network(url!, fit: BoxFit.cover, width: double.infinity))
+                                ? Image.file(file!,
+                                    fit: BoxFit.cover, width: double.infinity)
+                                : Image.network(url!,
+                                    fit: BoxFit.cover, width: double.infinity))
                             : Center(
                                 child: Icon(Icons.add_a_photo_outlined,
                                     color: Colors.grey.shade500, size: 32),
                               ),
                       ),
                     ),
-                    // small top-right remove button if has content
                     if (hasContent)
                       Positioned(
                         top: 6,
@@ -595,12 +761,12 @@ class _ImageTile extends StatelessWidget {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             padding: const EdgeInsets.all(4),
-                            child: const Icon(Icons.close, size: 16, color: Colors.white),
+                            child: const Icon(Icons.close,
+                                size: 16, color: Colors.white),
                           ),
                         ),
                       ),
-                    // progress ring
-                    if (progress >= 0 && progress < 1)
+                    if (progress >= 0 && progress < 0.999)
                       Positioned.fill(
                         child: Align(
                           alignment: Alignment.center,
@@ -618,7 +784,6 @@ class _ImageTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // Label & action
               Row(
                 children: [
                   Expanded(
@@ -645,6 +810,8 @@ class _ImageTile extends StatelessWidget {
 }
 
 class _PickSourceSheet extends StatelessWidget {
+  const _PickSourceSheet({super.key});
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -655,8 +822,14 @@ class _PickSourceSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(height: 4, width: 36, margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(16)),
+              Container(
+                height: 4,
+                width: 36,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined),

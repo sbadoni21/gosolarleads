@@ -75,15 +75,32 @@ class OperationsService {
     required String opsUid,
     required String opsName,
   }) async {
-    await _db.collection('leadPool').doc(leadId).update({
-      'operationsAssignedTo': opsUid,
-      'operationsAssignedToName': opsName,
-      'operationsAssignedAt': FieldValue.serverTimestamp(),
-      // also write inside operations map for convenience
-      'operations.assignTo': opsUid,
-      'operations.assignToName': opsName,
-    });
+await FirebaseFirestore.instance
+    .collection('leadPool')
+    .doc(leadId)
+    .update({
+  'operationsAssignedTo': null,
+  'operationsAssignedToName': null,
+  'operationsAssignedAt': null,
+
+  'operations.assignTo': null,
+  'operations.assignToName': null,
+  'operations.updatedAt': FieldValue.serverTimestamp(),
+});
+
   }
+// in your Service class
+Stream<Map<String, dynamic>?> watchOperationsMap(String leadId) {
+  return FirebaseFirestore.instance
+      .collection('leadPool')
+      .doc(leadId)
+      .snapshots()
+      .map((snap) {
+        final data = snap.data();
+        final ops = data?['operations'];
+        return (ops is Map<String, dynamic>) ? Map<String, dynamic>.from(ops) : null;
+      });
+}
 
   Stream<List<LeadPool>> watchLeadsAssignedToOperations(String opsUid) {
     return _db

@@ -78,31 +78,32 @@ class Installation {
     assignTo: map['assignTo'],
   );
 
-  Map<String, dynamic> toMap() => {
+Map<String, dynamic> toMap() {
+  return {
     'clientName': clientName,
     'contact': contact,
     'location': location,
-    'structureImage': structureImage,
-    'wiringACImage': wiringACImage,
-    'wiringDCImage': wiringDCImage,
-    'inverterImage': inverterImage,
-    'batteryImage': batteryImage,
-    'acdbImage': acdbImage,
-    'dcdbImage': dcdbImage,
-    'earthingImage': earthingImage,
-    'panelsImage': panelsImage,
-    'civilImage': civilImage,
-    'civilLegImage': civilLegImage,
-    'civilEarthingImage': civilEarthingImage,
-    'inverterOnImage': inverterOnImage,
-    'appInstallImage': appInstallImage,
-    'plantInspectionImage': plantInspectionImage,
-    'dampProofSprinklerImage': dampProofSprinklerImage,
     'installerName': installerName,
     'status': status,
-    'assignTo': assignTo,
+    if (assignTo != null) 'assignTo': assignTo,
+    if (structureImage != null) 'structureImage': structureImage,
+    if (wiringACImage != null) 'wiringACImage': wiringACImage,
+    if (wiringDCImage != null) 'wiringDCImage': wiringDCImage,
+    if (inverterImage != null) 'inverterImage': inverterImage,
+    if (batteryImage != null) 'batteryImage': batteryImage,
+    if (acdbImage != null) 'acdbImage': acdbImage,
+    if (dcdbImage != null) 'dcdbImage': dcdbImage,
+    if (earthingImage != null) 'earthingImage': earthingImage,
+    if (panelsImage != null) 'panelsImage': panelsImage,
+    if (civilImage != null) 'civilImage': civilImage,
+    if (civilLegImage != null) 'civilLegImage': civilLegImage,
+    if (civilEarthingImage != null) 'civilEarthingImage': civilEarthingImage,
+    if (inverterOnImage != null) 'inverterOnImage': inverterOnImage,
+    if (appInstallImage != null) 'appInstallImage': appInstallImage,
+    if (plantInspectionImage != null) 'plantInspectionImage': plantInspectionImage,
+    if (dampProofSprinklerImage != null) 'dampProofSprinklerImage': dampProofSprinklerImage,
   };
-
+}
   Installation copyWith({
     String? clientName,
     String? contact,

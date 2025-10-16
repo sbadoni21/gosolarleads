@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gosolarleads/providers/auth_provider.dart';
+import 'package:gosolarleads/screens/accountscreens/accounts_dashboard_screen.dart';
 import 'package:gosolarleads/screens/authentication.dart';
 import 'package:gosolarleads/screens/installationscreens/installation_screens.dart';
 import 'package:gosolarleads/screens/leads/sales_dashboard_screen.dart';
 import 'package:gosolarleads/screens/operations/operation_dashboard_screen.dart';
 import 'package:gosolarleads/screens/surveyscreens/survey_screen.dart';
+
+// ✅ keep this import, and REMOVE any ChatTab class from this file
 import 'package:gosolarleads/tabs/chattab.dart';
+
 import 'package:gosolarleads/tabs/leadtab.dart';
 import 'package:gosolarleads/tabs/noticeboardtab.dart';
 import 'package:gosolarleads/tabs/trackingtab.dart';
@@ -42,33 +46,30 @@ class Homescreen extends ConsumerWidget {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
-        if (user == null) {
-          return const AuthenticationScreen();
-        }
+        if (user == null) return const AuthenticationScreen();
 
         final role = user.role.trim().toLowerCase();
         final isAdmin = role == 'admin' || role == 'superadmin';
+        final isSuperAdmin = role == 'superadmin';
         final isSalesOfficer = role == 'sales' || role == 'salesofficer';
         final isSurveyor = role == 'survey';
         final isInstallation = role == 'installation';
         final isOperation = role == 'operation';
+        final isAccounts = role == 'accounts';
 
-        if (isSurveyor) {
-          return const SurveysListScreen();
-        }
+        if (isSurveyor) return const SurveysListScreen();
 
-        final showSalesTab = isSalesOfficer;
-        final showLeadsTab = isAdmin;
-
+        // ✅ Tabs and views in EXACT same order
         final tabs = <Tab>[
+          if (isAccounts) const Tab(icon: Icon(Icons.work), text: "Accounts"),
           if (isOperation)
-            const Tab(icon: Icon(Icons.work), text: "Operations"),
+            const Tab(icon: Icon(Icons.work_outline), text: "Operations"),
           if (isInstallation)
             const Tab(icon: Icon(Icons.settings), text: 'Installation'),
-          if (showSalesTab)
+          if (isSalesOfficer)
             const Tab(icon: Icon(Icons.person_2_outlined), text: 'Sales'),
           const Tab(icon: Icon(Icons.chat_bubble_outline), text: 'Chat'),
-          if (showLeadsTab)
+          if (isAdmin)
             const Tab(icon: Icon(Icons.people_outline), text: 'Leads'),
           const Tab(icon: Icon(Icons.spatial_tracking), text: 'Tracking'),
           const Tab(
@@ -76,11 +77,12 @@ class Homescreen extends ConsumerWidget {
         ];
 
         final views = <Widget>[
+          if (isAccounts) const AccountsDashboardScreen(),
           if (isOperation) const OperationsDashboardScreen(),
           if (isInstallation) const InstallationScreens(),
-          if (showSalesTab) const SalesDashboardScreen(),
-          const ChatTab(),
-          if (showLeadsTab) const LeadTab(),
+          if (isSalesOfficer) const SalesDashboardScreen(),
+          const ChatTab(), // from tabs/chattab.dart
+          if (isAdmin) const LeadTab(),
           const TrackingTab(),
           const NoticeBoardTab(),
         ];

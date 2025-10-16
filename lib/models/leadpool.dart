@@ -46,6 +46,9 @@ class LeadPool {
   final String? installationAssignedTo;
   final String? installationAssignedToName;
   final DateTime? installationAssignedAt;
+    final String? accountsAssignedTo;
+  final String? accountsAssignedToName;
+  final DateTime? accountsAssignedAt;
   final Operations? operations;
 final Accounts? accounts;
 
@@ -72,6 +75,9 @@ final DateTime? operationsAssignedAt;
       required this.createdTime,
       this.installationAssignedAt,
       this.accounts,
+      this.accountsAssignedAt,
+      this.accountsAssignedTo,
+      this.accountsAssignedToName,
       required this.date,
       required this.incentive,
       required this.pitchedAmount,
@@ -127,13 +133,16 @@ final DateTime? operationsAssignedAt;
     }
 Accounts? accountsData;
 final rawAcc = data['accounts'];
+    DateTime? _ts(dynamic v) => v is Timestamp ? v.toDate() : null;
+
 if (rawAcc is Map<String, dynamic>) {
   accountsData = Accounts.fromMap(rawAcc);
-}
+}  final String? _accAssignTo = data['accountsAssignedTo'] as String?;
+  final String? _accAssignToName = data['accountsAssignedToName'] as String?;
+  final DateTime? _accAssignedAt = _ts(data['accountsAssignedAt']);
     // Helper to read DateTime from Timestamp
-    DateTime? _ts(dynamic v) => v is Timestamp ? v.toDate() : null;
 Operations? operationsData;
-final rawOps = data['operation'];
+final rawOps = data['operations'];
 if (rawOps is Map<String, dynamic>) {
   operationsData = Operations.fromMap(rawOps);
 }
@@ -174,7 +183,9 @@ accounts: accountsData,
       assignedAt: _ts(data['assignedAt']),
 
       groupId: data['groupId'] as String?,
-
+    accountsAssignedTo: _accAssignTo,
+    accountsAssignedToName: _accAssignToName,
+    accountsAssignedAt: _accAssignedAt,
       // SLA breach meta
       registrationSlaBreachReason:
           data['registrationSlaBreachReason'] as String?,
@@ -229,15 +240,22 @@ accounts: accountsData,
     if (rawInst is Map<String, dynamic>) {
       installationData = Installation.fromMap(rawInst);
     }
-Accounts? accountsData;
-final rawAcc = map['accounts'];
-if (rawAcc is Map<String, dynamic>) {
-  accountsData = Accounts.fromMap(rawAcc);
-}
-    DateTime? _ts(dynamic v) =>
-        v is Timestamp ? v.toDate() : (v is DateTime ? v : null);
+ Accounts? accountsData;
+  final rawAcc = map['accounts'];
+  if (rawAcc is Map<String, dynamic>) {
+    accountsData = Accounts.fromMap(rawAcc);
+  }
+
+  DateTime? _ts(dynamic v) =>
+      v is Timestamp ? v.toDate() : (v is DateTime ? v : null);
+
+  // ADD: flat accounts assignment
+  final String? _accAssignTo = map['accountsAssignedTo'] as String?;
+  final String? _accAssignToName = map['accountsAssignedToName'] as String?;
+  final DateTime? _accAssignedAt = _ts(map['accountsAssignedAt']);
+
 Operations? operationsData;
-final rawOps = map['operation'];
+final rawOps = map['operations'];
 if (rawOps is Map<String, dynamic>) {
   operationsData = Operations.fromMap(rawOps);
 }
@@ -292,6 +310,9 @@ accounts: accountsData,
           _ts(map['installationSlaBreachRecordedAt']),
       installationSlaBreachRecordedBy:
           map['installationSlaBreachRecordedBy'] as String?,
+    accountsAssignedTo: _accAssignTo,
+    accountsAssignedToName: _accAssignToName,
+    accountsAssignedAt: _accAssignedAt,
 
       // SLA windows
       registrationSlaStartDate: _ts(map['registrationSlaStartDate']),
@@ -334,7 +355,9 @@ accounts: accountsData,
       'status': status,
       'accountStatus': accountStatus,
       'surveyStatus': surveyStatus,
-
+    'accountsAssignedTo': accountsAssignedTo,
+    'accountsAssignedToName': accountsAssignedToName,
+    'accountsAssignedAt': _ts(accountsAssignedAt),
       'createdBy': createdBy,
       'createdTime': _ts(createdTime),
       'date': _ts(date),
@@ -382,7 +405,9 @@ accounts: accountsData,
     String? number,
     String? address,
     String? location,
-    String? state,
+    String? state,  String? accountsAssignedTo,
+  String? accountsAssignedToName,
+  DateTime? accountsAssignedAt,
     String? electricityConsumption,
     String? powercut,
     String? additionalInfo,
@@ -458,7 +483,9 @@ accounts: accounts ?? this.accounts,
           this.installationSlaBreachRecordedAt,
       installationSlaBreachRecordedBy: installationSlaBreachRecordedBy ??
           this.installationSlaBreachRecordedBy,
-
+  accountsAssignedTo: accountsAssignedTo ?? this.accountsAssignedTo,
+  accountsAssignedToName: accountsAssignedToName ?? this.accountsAssignedToName,
+  accountsAssignedAt: accountsAssignedAt ?? this.accountsAssignedAt,
       // assignment
       assignedTo: assignedTo ?? this.assignedTo,
       assignedToName: assignedToName ?? this.assignedToName,
@@ -534,6 +561,9 @@ accounts: accounts ?? this.accounts,
         return status;
     }
   }
+bool get hasAccountsAssignee =>
+    (accountsAssignedTo?.trim().isNotEmpty ?? false) ||
+    (accounts?.assignTo?.trim().isNotEmpty ?? false);
 
   // SLA Helper Methods
   bool get isRegistrationSlaActive =>

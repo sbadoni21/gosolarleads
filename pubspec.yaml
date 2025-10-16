@@ -54,6 +54,8 @@ dependencies:
   # File Picking
   image_picker: 
   file_picker: 
+  fl_chart:
+  characters:
   
   # Audio Recording
   # State Management
