@@ -7,11 +7,12 @@ import 'package:gosolarleads/screens/authentication.dart';
 import 'package:gosolarleads/screens/installationscreens/installation_screens.dart';
 import 'package:gosolarleads/screens/leads/sales_dashboard_screen.dart';
 import 'package:gosolarleads/screens/operations/operation_dashboard_screen.dart';
+import 'package:gosolarleads/screens/privacy_policy.dart';
+import 'package:gosolarleads/screens/refund_policy.dart';
+import 'package:gosolarleads/screens/return_policy.dart';
 import 'package:gosolarleads/screens/surveyscreens/survey_screen.dart';
-
-// ✅ keep this import, and REMOVE any ChatTab class from this file
+import 'package:gosolarleads/screens/terms_and_conditions.dart';
 import 'package:gosolarleads/tabs/chattab.dart';
-
 import 'package:gosolarleads/tabs/leadtab.dart';
 import 'package:gosolarleads/tabs/noticeboardtab.dart';
 import 'package:gosolarleads/tabs/trackingtab.dart';
@@ -102,12 +103,20 @@ class Homescreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(user.name,
-                              style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                          Text(user.role,
-                              style: const TextStyle(
-                                  fontSize: 12, color: AppTheme.mediumGrey)),
+                          Text(
+                            user.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            user.role,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.mediumGrey,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(width: 8),
@@ -119,21 +128,79 @@ class Homescreen extends ConsumerWidget {
                                 ? user.name[0].toUpperCase()
                                 : 'U',
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         onSelected: (value) {
-                          if (value == 'logout') _signOut(context, ref);
+                          if (value == 'privacy') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PrivacyPolicy()),
+                            );
+                          } else if (value == 'terms') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const TermsAndConditions()),
+                            );
+                          } else if (value == 'return') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const ReturnPolicyPage()),
+                            );
+                          } else if (value == 'refund') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const RefundPolicyPage()),
+                            );
+                          } else if (value == 'logout') {
+                            _signOut(context, ref);
+                          }
                         },
                         itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'profile',
+                          const PopupMenuItem(
+                            value: 'privacy',
                             child: Row(
                               children: [
-                                const Icon(Icons.person_outline, size: 20),
-                                const SizedBox(width: 12),
-                                Text(user.email),
+                                Icon(Icons.privacy_tip_outlined, size: 20),
+                                SizedBox(width: 12),
+                                Text('Privacy Policy'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'terms',
+                            child: Row(
+                              children: [
+                                Icon(Icons.article_outlined, size: 20),
+                                SizedBox(width: 12),
+                                Text('Terms & Conditions'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'return',
+                            child: Row(
+                              children: [
+                                Icon(Icons.assignment_return_outlined,
+                                    size: 20),
+                                SizedBox(width: 12),
+                                Text('Return Policy'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'refund',
+                            child: Row(
+                              children: [
+                                Icon(Icons.currency_rupee_outlined, size: 20),
+                                SizedBox(width: 12),
+                                Text('Refund Policy'),
                               ],
                             ),
                           ),
@@ -145,8 +212,10 @@ class Homescreen extends ConsumerWidget {
                                 Icon(Icons.logout,
                                     size: 20, color: AppTheme.errorRed),
                                 SizedBox(width: 12),
-                                Text('Sign Out',
-                                    style: TextStyle(color: AppTheme.errorRed)),
+                                Text(
+                                  'Sign Out',
+                                  style: TextStyle(color: AppTheme.errorRed),
+                                ),
                               ],
                             ),
                           ),

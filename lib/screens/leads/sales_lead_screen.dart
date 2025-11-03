@@ -2695,7 +2695,7 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
                             // pick ops user
                             final qs = await FirebaseFirestore.instance
                                 .collection('users')
-                                .where('role', isEqualTo: 'operations')
+                                .where('role', isEqualTo: 'operation')
                                 .orderBy('name')
                                 .get();
 

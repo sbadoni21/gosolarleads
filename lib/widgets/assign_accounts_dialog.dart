@@ -26,7 +26,8 @@ class AssignAccountsDialog extends ConsumerWidget {
                 children: [
                   const Expanded(
                     child: Text('Assign to Accounts',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -50,19 +51,26 @@ class AssignAccountsDialog extends ConsumerWidget {
                     itemBuilder: (ctx, i) {
                       final u = users[i];
                       return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.account_balance_wallet)),
+                        leading: const CircleAvatar(
+                            child: Icon(Icons.account_balance_wallet)),
                         title: Text(u.name),
                         subtitle: Text(u.email),
                         trailing: ElevatedButton(
                           onPressed: () async {
-                            await ref.read(accountsServiceProvider).assignAccounts(
+                            await ref
+                                .read(accountsServiceProvider)
+                                .assignAccounts(
                                   leadId: leadId,
                                   accountsUid: u.uid,
                                   accountsName: u.name,
                                 );
+                            await ref
+                                .read(accountsServiceProvider)
+                                .startFirstSLA(leadId: leadId);
                             if (ctx.mounted) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(content: Text('Assigned to ${u.name}')),
+                                SnackBar(
+                                    content: Text('Assigned to ${u.name}')),
                               );
                               Navigator.pop(ctx, true);
                             }

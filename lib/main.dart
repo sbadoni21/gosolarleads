@@ -21,7 +21,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   if (Platform.isAndroid) {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
@@ -37,7 +37,7 @@ Future<void> main() async {
   } else {
     await Firebase.initializeApp();
   }
-  
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(const ProviderScope(child: MyApp()));
@@ -62,11 +62,11 @@ class _MyAppState extends ConsumerState<MyApp> {
   Future<void> _initializeFCM() async {
     // Initialize FCM Service
     await FCMService().initialize();
-    
+
     // Wait for auth state and register token
     ref.read(authStateProvider).whenData((user) async {
       if (user != null) {
-          await FCMService().registerDeviceToken(
+        await FCMService().registerDeviceToken(
           userId: user.uid,
           groupIds: [], // Add user's group IDs here if available
         );
@@ -81,7 +81,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'GoSol Leads Pool',
+      title: 'GoSolar India Leads Pool',
       theme: AppTheme.lightTheme,
       initialRoute: '/',
       routes: {

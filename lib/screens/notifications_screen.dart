@@ -13,10 +13,12 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with AutomaticKeepAliveClientMixin {
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
+    with AutomaticKeepAliveClientMixin {
   final _fcm = FCMService();
 
   @override
@@ -35,8 +37,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
     final currentUser = ref.watch(currentUserProvider).value;
 
     return Scaffold(
+      
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
+        automaticallyImplyLeading: true,
+        foregroundColor: AppTheme.lightGrey,
         elevation: 0,
         backgroundColor: AppTheme.primaryBlue,
         titleSpacing: 0,
@@ -49,10 +54,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
                 color: Colors.white.withOpacity(.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.notifications_active_outlined, color: Colors.white),
+              child: const Icon(Icons.notifications_active_outlined,
+                  color: Colors.white),
             ),
             const SizedBox(width: 12),
-            const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w800)),
+            const Text('Notifications',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, color: AppTheme.lightGrey)),
           ],
         ),
         actions: [
@@ -60,23 +68,30 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
             tooltip: 'Mark all as read',
             icon: const Icon(Icons.done_all, color: Colors.white),
             onPressed: () async {
-              final messenger = ScaffoldMessenger.maybeOf(context); // capture early (avoids deactivated ancestor)
+              final messenger = ScaffoldMessenger.maybeOf(
+                  context); // capture early (avoids deactivated ancestor)
               try {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('Mark all as read?'),
-                    content: const Text('This will mark every notification as read.'),
+                    content: const Text(
+                        'This will mark every notification as read.'),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Mark all')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Mark all')),
                     ],
                   ),
                 );
                 if (confirm != true) return;
 
                 await _fcm.markAllAsRead();
-                messenger?.showSnackBar(const SnackBar(content: Text('All marked as read')));
+                messenger?.showSnackBar(
+                    const SnackBar(content: Text('All marked as read')));
                 await _refresh();
               } catch (e) {
                 messenger?.showSnackBar(SnackBar(content: Text('Failed: $e')));
@@ -91,7 +106,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
             height: 14,
             decoration: BoxDecoration(
               color: Colors.grey.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(18)),
             ),
           ),
         ),
@@ -115,14 +131,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
                         color: AppTheme.primaryBlue.withOpacity(0.08),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.notifications_none, size: 72, color: AppTheme.primaryBlue),
+                      child: const Icon(Icons.notifications_none,
+                          size: 72, color: AppTheme.primaryBlue),
                     ),
                   ),
                   const SizedBox(height: 16),
                   const Center(
                     child: Text(
                       'You’re all caught up!',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -140,7 +158,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
 
           // group by day
           final groups = _groupByDay(list);
-          final totalUnread = list.where((n) => !n.isReadBy(currentUser?.uid ?? '')).length;
+          final totalUnread =
+              list.where((n) => !n.isReadBy(currentUser?.uid ?? '')).length;
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -149,7 +168,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: _headerSummary(total: list.length, unread: totalUnread),
+                    child:
+                        _headerSummary(total: list.length, unread: totalUnread),
                   ),
                 ),
                 for (final entry in groups.entries) ...[
@@ -210,7 +230,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
         color: Colors.white,
         border: Border.all(color: Colors.black12),
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(.03), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
       ),
       child: Row(
         children: [
@@ -228,13 +253,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
               decoration: BoxDecoration(
                 color: AppTheme.primaryBlue.withOpacity(.08),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.primaryBlue.withOpacity(.25)),
+                border:
+                    Border.all(color: AppTheme.primaryBlue.withOpacity(.25)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.markunread_outlined, size: 16, color: AppTheme.primaryBlue),
+                  const Icon(Icons.markunread_outlined,
+                      size: 16, color: AppTheme.primaryBlue),
                   const SizedBox(width: 6),
-                  Text('$unread unread', style: const TextStyle(color: AppTheme.primaryBlue, fontWeight: FontWeight.w700)),
+                  Text('$unread unread',
+                      style: const TextStyle(
+                          color: AppTheme.primaryBlue,
+                          fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
@@ -246,7 +276,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
   Widget _dayHeader(DateTime date) {
     final now = DateTime.now();
     final isToday = DateUtils.isSameDay(date, now);
-    final isYesterday = DateUtils.isSameDay(date, now.subtract(const Duration(days: 1)));
+    final isYesterday =
+        DateUtils.isSameDay(date, now.subtract(const Duration(days: 1)));
     final label = isToday
         ? 'Today'
         : isYesterday
@@ -254,7 +285,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
             : DateFormat('EEE, dd MMM').format(date);
     return Row(
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.black87)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87)),
         const SizedBox(width: 8),
         Expanded(child: Divider(color: Colors.black12)),
       ],
@@ -268,7 +303,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
       // don’t show toast for every single tap; keep UI calm.
       ref.invalidate(notificationsProvider);
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text('Failed to mark as read: $e')));
+      messenger
+          ?.showSnackBar(SnackBar(content: Text('Failed to mark as read: $e')));
     }
   }
 
@@ -391,7 +427,9 @@ class _NotificationCard extends StatelessWidget {
             title: const Text('Delete notification?'),
             content: const Text('This action cannot be undone.'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel')),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(ctx, true),
@@ -420,7 +458,10 @@ class _NotificationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.black12),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(.03), blurRadius: 10, offset: const Offset(0, 4)),
+              BoxShadow(
+                  color: Colors.black.withOpacity(.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4)),
             ],
           ),
           child: Row(
@@ -431,7 +472,8 @@ class _NotificationCard extends StatelessWidget {
                 height: 88,
                 decoration: BoxDecoration(
                   color: isRead ? _accent.withOpacity(.35) : _accent,
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(14)),
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(14)),
                 ),
               ),
               Expanded(
@@ -459,7 +501,9 @@ class _NotificationCard extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 15,
-                                      fontWeight: isRead ? FontWeight.w600 : FontWeight.w800,
+                                      fontWeight: isRead
+                                          ? FontWeight.w600
+                                          : FontWeight.w800,
                                       color: Colors.black87,
                                       letterSpacing: -.1,
                                     ),
@@ -468,7 +512,9 @@ class _NotificationCard extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text(
                                   _rel(notification.createdAt),
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600),
                                 ),
                               ],
                             ),
@@ -477,7 +523,10 @@ class _NotificationCard extends StatelessWidget {
                               notification.body,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 13, color: Colors.grey.shade800, height: 1.25),
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade800,
+                                  height: 1.25),
                             ),
                             const SizedBox(height: 8),
                             Wrap(
@@ -513,7 +562,11 @@ class _NotificationCard extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: _accent, letterSpacing: .4),
+        style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: _accent,
+            letterSpacing: .4),
       ),
     );
   }
@@ -531,7 +584,8 @@ class _NotificationCard extends StatelessWidget {
         children: [
           Icon(Icons.fiber_manual_record, size: 10, color: Colors.black87),
           SizedBox(width: 4),
-          Text('UNREAD', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
+          Text('UNREAD',
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
         ],
       ),
     );

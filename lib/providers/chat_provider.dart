@@ -134,6 +134,7 @@ class ChatService {
     required String description,
     required String state,
     required String createdBy,
+    required List<String> memberIds,
     required List<ChatMember> members,
     List<String> districts = const [], // NEW
     String? groupIcon,
@@ -157,6 +158,7 @@ class ChatService {
       'lastMessage': null,
       'lastMessageTime': null,
       'groupIcon': groupIcon,
+      'memberIds': memberIds, // NEW FIELD
     });
   }
 

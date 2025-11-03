@@ -695,6 +695,7 @@ class _ImageTile extends StatelessWidget {
   final VoidCallback onPick;
   final VoidCallback onRemove;
   final VoidCallback onPreview;
+  final XFile? xFile; // Add this to access the XFile directly
 
   const _ImageTile({
     required this.label,
@@ -704,11 +705,12 @@ class _ImageTile extends StatelessWidget {
     required this.onPick,
     required this.onRemove,
     required this.onPreview,
+    this.xFile, // Add this parameter
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasContent = file != null || (url != null && url!.isNotEmpty);
+    final hasContent = xFile != null || (url != null && url!.isNotEmpty);
 
     return Material(
       color: Colors.white,
@@ -738,11 +740,7 @@ class _ImageTile extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: hasContent
-                            ? (file != null
-                                ? Image.file(file!,
-                                    fit: BoxFit.cover, width: double.infinity)
-                                : Image.network(url!,
-                                    fit: BoxFit.cover, width: double.infinity))
+                            ? _buildImageWidget()
                             : Center(
                                 child: Icon(Icons.add_a_photo_outlined,
                                     color: Colors.grey.shade500, size: 32),
@@ -784,15 +782,18 @@ class _ImageTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              Row(children:[
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),]),
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                 
                   const SizedBox(width: 8),
                   TextButton.icon(
                     onPressed: onPick,
@@ -805,6 +806,50 @@ class _ImageTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildImageWidget() {
+    // Priority: XFile (most reliable) > Network URL > File fallback
+    if (xFile != null) {
+      return Image.file(
+        File(xFile!.path),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          // Fallback to bytes if file path doesn't work
+          return FutureBuilder<Uint8List>(
+            future: xFile!.readAsBytes(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return Image.memory(
+                  snapshot.data!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                );
+              }
+              return Center(
+                child: Icon(Icons.broken_image, color: Colors.grey.shade400),
+              );
+            },
+          );
+        },
+      );
+    } else if (url != null && url!.isNotEmpty) {
+      return Image.network(
+        url!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        errorBuilder: (context, error, stackTrace) {
+          return Center(
+            child: Icon(Icons.broken_image, color: Colors.grey.shade400),
+          );
+        },
+      );
+    }
+
+    return Center(
+      child: Icon(Icons.broken_image, color: Colors.grey.shade400),
     );
   }
 }

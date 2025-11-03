@@ -32,6 +32,22 @@ class OperationsService {
     return ref.getDownloadURL();
   }
 
+  Future<String> uploadInstallationImage({
+    required String leadId,
+    required String imageKey,
+    required File imageFile,
+  }) async {
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('leads')
+        .child(leadId)
+        .child('installation')
+        .child('$imageKey.jpg');
+
+    final uploadTask = await storageRef.putFile(imageFile);
+    return await uploadTask.ref.getDownloadURL();
+  }
+
   /// Save operations (upload any provided PDFs & merge)
   /// files map keys: 'operationPdf1', 'operationPdf2', 'jansamarthPdf'
   Future<void> saveOperations({
@@ -75,32 +91,30 @@ class OperationsService {
     required String opsUid,
     required String opsName,
   }) async {
-await FirebaseFirestore.instance
-    .collection('leadPool')
-    .doc(leadId)
-    .update({
-  'operationsAssignedTo': null,
-  'operationsAssignedToName': null,
-  'operationsAssignedAt': null,
-
-  'operations.assignTo': null,
-  'operations.assignToName': null,
-  'operations.updatedAt': FieldValue.serverTimestamp(),
-});
-
+    await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
+      'operationsAssignedTo': null,
+      'operationsAssignedToName': null,
+      'operationsAssignedAt': null,
+      'operations.assignTo': null,
+      'operations.assignToName': null,
+      'operations.updatedAt': FieldValue.serverTimestamp(),
+    });
   }
+
 // in your Service class
-Stream<Map<String, dynamic>?> watchOperationsMap(String leadId) {
-  return FirebaseFirestore.instance
-      .collection('leadPool')
-      .doc(leadId)
-      .snapshots()
-      .map((snap) {
-        final data = snap.data();
-        final ops = data?['operations'];
-        return (ops is Map<String, dynamic>) ? Map<String, dynamic>.from(ops) : null;
-      });
-}
+  Stream<Map<String, dynamic>?> watchOperationsMap(String leadId) {
+    return FirebaseFirestore.instance
+        .collection('leadPool')
+        .doc(leadId)
+        .snapshots()
+        .map((snap) {
+      final data = snap.data();
+      final ops = data?['operations'];
+      return (ops is Map<String, dynamic>)
+          ? Map<String, dynamic>.from(ops)
+          : null;
+    });
+  }
 
   Stream<List<LeadPool>> watchLeadsAssignedToOperations(String opsUid) {
     return _db

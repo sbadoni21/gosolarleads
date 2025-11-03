@@ -25,17 +25,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late Animation<double> _logoFadeAnimation;
   late Animation<double> _logoScaleAnimation;
   late Animation<double> _logoRotationAnimation;
-  
+
   late Animation<double> _textFadeAnimation;
   late Animation<Offset> _textSlideAnimation;
-  
+
   late Animation<double> _glowAnimation;
   late Animation<double> _progressAnimation;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Logo animations
     _logoController = AnimationController(
       vsync: this,
@@ -56,7 +56,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       ),
     );
 
-    _logoRotationAnimation = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
+    _logoRotationAnimation =
+        Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
       CurvedAnimation(
         parent: _logoController,
         curve: const Interval(0.0, 0.6, curve: Curves.easeInOut),
@@ -126,11 +127,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _navigateToNextScreen() async {
     await Future.delayed(const Duration(seconds: 3));
-    
+
     if (!mounted) return;
 
     final authState = ref.read(authStateProvider);
-    
+
     authState.when(
       data: (user) {
         if (user != null) {
@@ -165,7 +166,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
                 const AuthenticationScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
             transitionDuration: const Duration(milliseconds: 500),
@@ -221,14 +223,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.white
-                                        .withOpacity(0.3 * _glowAnimation.value),
+                                    color: Colors.white.withOpacity(
+                                        0.3 * _glowAnimation.value),
                                     blurRadius: 40 * _glowAnimation.value,
                                     spreadRadius: 10 * _glowAnimation.value,
                                   ),
                                   BoxShadow(
-                                    color: AppTheme.primaryOrange
-                                        .withOpacity(0.5 * _glowAnimation.value),
+                                    color: AppTheme.primaryOrange.withOpacity(
+                                        0.5 * _glowAnimation.value),
                                     blurRadius: 60 * _glowAnimation.value,
                                     spreadRadius: 5 * _glowAnimation.value,
                                   ),
@@ -268,7 +270,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       child: Column(
                         children: [
                           const Text(
-                            'GoSol Vendor',
+                            'GoSolar India',
                             style: TextStyle(
                               fontSize: 38,
                               fontWeight: FontWeight.bold,
@@ -429,7 +431,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           animation: _glowController,
           builder: (context, child) {
             return Positioned(
-              bottom: -100 + (40 * math.cos(_glowController.value * 2 * math.pi)),
+              bottom:
+                  -100 + (40 * math.cos(_glowController.value * 2 * math.pi)),
               left: -100 + (40 * math.sin(_glowController.value * 2 * math.pi)),
               child: Container(
                 width: 300,

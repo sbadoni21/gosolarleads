@@ -39,10 +39,10 @@
               "client_type": 3
             },
             {
-              "client_id": "262021635278-lb8231gqniif4df4ekqn2k9sdjimt10b.apps.googleusercontent.com",
+              "client_id": "262021635278-29ocr9gf4sgor9j6hdfqq1snbf0hu66f.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.shivam.gosolarvendor"
+                "bundle_id": "com.shivam.gosolarleads"
               }
             }
           ]
@@ -57,6 +57,30 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "262021635278-k3k1o7lvf99qqauc15h1ass0t81qrhiq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivam.gosolarleads",
+            "certificate_hash": "e7e01ba863be99e89da1fb7bbaf472a52525d026"
+          }
+        },
+        {
+          "client_id": "262021635278-kl017no74bp35ke32p6imotud5523ndd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivam.gosolarleads",
+            "certificate_hash": "f943fc2fa60bf2608995b8467631957ad5323478"
+          }
+        },
+        {
+          "client_id": "262021635278-t6j62m9k8rl3aiehi2hflm6q53spqsvt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivam.gosolarleads",
+            "certificate_hash": "b63bbae60695efe1a57427b3b1a3e37469cd3484"
+          }
+        },
         {
           "client_id": "262021635278-ged0ghcof9ndepd0h6ous6j3bkrofplv.apps.googleusercontent.com",
           "client_type": 3
@@ -75,10 +99,10 @@
               "client_type": 3
             },
             {
-              "client_id": "262021635278-lb8231gqniif4df4ekqn2k9sdjimt10b.apps.googleusercontent.com",
+              "client_id": "262021635278-29ocr9gf4sgor9j6hdfqq1snbf0hu66f.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.shivam.gosolarvendor"
+                "bundle_id": "com.shivam.gosolarleads"
               }
             }
           ]
@@ -127,10 +151,10 @@
               "client_type": 3
             },
             {
-              "client_id": "262021635278-lb8231gqniif4df4ekqn2k9sdjimt10b.apps.googleusercontent.com",
+              "client_id": "262021635278-29ocr9gf4sgor9j6hdfqq1snbf0hu66f.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.shivam.gosolarvendor"
+                "bundle_id": "com.shivam.gosolarleads"
               }
             }
           ]

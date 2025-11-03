@@ -379,6 +379,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         createdBy: currentUser.email,
         members: members,
         groupIcon: iconUrl,
+        memberIds: [..._selectedUserIds, currentUser.uid], // NEW FIELD
       );
 
       if (mounted) {
@@ -644,7 +645,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   if (r == 'installation') installation++;
                   if (r == 'accounts') accounts++;
 
-                  if (r == 'operations') operations++;
+                  if (r == 'operation') operations++;
                 }
                 return Wrap(
                   spacing: 4,
