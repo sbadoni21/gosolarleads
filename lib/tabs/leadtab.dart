@@ -57,7 +57,6 @@ class _LeadTabState extends ConsumerState<LeadTab> {
   @override
   Widget build(BuildContext context) {
     final leadsAsync = ref.watch(allLeadsProvider);
-    final statsAsync = ref.watch(leadStatisticsProvider);
     final user = ref.watch(currentUserProvider).value;
     final isAdmin = user?.role == "superadmin" || user?.role == "admin";
 
@@ -81,11 +80,6 @@ class _LeadTabState extends ConsumerState<LeadTab> {
             child: CustomScrollView(
               controller: _scrollController, // 🔥 Attach ScrollController
               slivers: [
-                // 🔥 Statistics Section - Now scrollable
-                SliverToBoxAdapter(
-                  child: _buildStatisticsSection(statsAsync),
-                ),
-
                 // Filter Chips
                 SliverToBoxAdapter(
                   child: Container(
@@ -209,6 +203,111 @@ class _LeadTabState extends ConsumerState<LeadTab> {
     );
   }
 
+  Widget _buildRoleSection(
+    String title,
+    AsyncValue<Map<String, dynamic>> statsAsync,
+  ) {
+    return statsAsync.when(
+      data: (stats) => _buildRoleStatsBox(title, stats),
+      loading: () => _buildLoadingState(),
+      error: (e, s) => _buildErrorState(),
+    );
+  }
+
+  Widget _buildRoleStatsBox(String title, Map<String, dynamic> stats) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.analytics_rounded,
+                  color: AppTheme.primaryBlue, size: 26),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildKeyValueGrid(stats),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeyValueGrid(Map<String, dynamic> stats) {
+    final entries = stats.entries.toList();
+
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      itemCount: entries.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisExtent: 60,
+      ),
+      itemBuilder: (_, i) {
+        final key = entries[i].key;
+        final val = entries[i].value;
+
+        return Container(
+          margin: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _prettyKey(key),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              Text(
+                "$val",
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _prettyKey(String key) {
+    return key
+        .replaceAll(RegExp(r'([a-z])([A-Z])'), r'$1 $2')
+        .replaceAll('_', ' ')
+        .replaceAll(RegExp(' +'), ' ')
+        .trim()
+        .toUpperCase();
+  }
+
   // 🔥 NEW: Build Multiple Floating Action Buttons
   Widget _buildFloatingButtons(bool isAdmin) {
     return Column(
@@ -296,522 +395,6 @@ class _LeadTabState extends ConsumerState<LeadTab> {
             ),
           ),
       ],
-    );
-  }
-
-// Enhanced Statistics Section Widget with better UX
-  Widget _buildStatisticsSection(AsyncValue<Map<String, dynamic>> statsAsync) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: statsAsync.when(
-        data: (stats) => _buildStatsContent(stats),
-        loading: () => _buildLoadingState(),
-        error: (error, stack) => _buildErrorState(),
-      ),
-    );
-  }
-
-  Widget _buildStatsContent(Map<String, dynamic> stats) {
-    final total = stats['total'] ?? 0;
-    final submitted = stats['submitted'] ?? 0;
-    final pending = stats['pending'] ?? 0;
-    final completed = stats['completed'] ?? 0;
-    final rejected = stats['rejected'] ?? 0;
-    final assigned = stats['assigned'] ?? 0;
-    final unassigned = stats['unassigned'] ?? 0;
-
-    return Column(
-      children: [
-        // Main Stats Card
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primaryBlue,
-                AppTheme.primaryBlue.withOpacity(0.85),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryBlue.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Header with Total Count
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.analytics_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Lead Overview',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Total Performance Metrics',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Animated Total Count Badge
-                  TweenAnimationBuilder<int>(
-                    tween: IntTween(begin: 0, end: total),
-                    duration: const Duration(milliseconds: 1500),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.people_rounded,
-                              size: 20,
-                              color: AppTheme.primaryBlue,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$value',
-                              style: const TextStyle(
-                                color: AppTheme.primaryBlue,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Assignment Overview Bar
-              _buildAssignmentBar(assigned, unassigned, total),
-              const SizedBox(height: 24),
-
-              // Status Grid
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildAnimatedStatCard(
-                      icon: Icons.send_rounded,
-                      label: 'Submitted',
-                      count: submitted,
-                      total: total,
-                      color: AppTheme.primaryBlue,
-                      delay: 0,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildAnimatedStatCard(
-                      icon: Icons.pending_actions_rounded,
-                      label: 'Pending',
-                      count: pending,
-                      total: total,
-                      color: AppTheme.warningAmber,
-                      delay: 100,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildAnimatedStatCard(
-                      icon: Icons.check_circle_rounded,
-                      label: 'Completed',
-                      count: completed,
-                      total: total,
-                      color: AppTheme.successGreen,
-                      delay: 200,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildAnimatedStatCard(
-                      icon: Icons.cancel_rounded,
-                      label: 'Rejected',
-                      count: rejected,
-                      total: total,
-                      color: AppTheme.errorRed,
-                      delay: 300,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Additional Insights Section
-        if (stats['registrationCompleted'] != null ||
-            stats['installationCompleted'] != null)
-          const SizedBox(height: 16),
-
-        if (stats['registrationCompleted'] != null ||
-            stats['installationCompleted'] != null)
-          _buildInsightsSection(stats),
-      ],
-    );
-  }
-
-// Assignment Progress Bar
-  Widget _buildAssignmentBar(int assigned, int unassigned, int total) {
-    final assignedPercent = total > 0 ? (assigned / total) : 0.0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Assignment Status',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              '${(assignedPercent * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: assignedPercent),
-            duration: const Duration(milliseconds: 1200),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              return LinearProgressIndicator(
-                value: value,
-                minHeight: 8,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildMiniStat('Assigned', assigned, Colors.white),
-            _buildMiniStat('Unassigned', unassigned, Colors.white70),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniStat(String label, int count, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          '$label: $count',
-          style: TextStyle(
-            color: color,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-// Animated Stat Card with delayed entrance
-  Widget _buildAnimatedStatCard({
-    required IconData icon,
-    required String label,
-    required int count,
-    required int total,
-    required Color color,
-    required int delay,
-  }) {
-    final percentage = total > 0 ? (count / total * 100) : 0.0;
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 600 + delay),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: value,
-          child: Opacity(
-            opacity: value,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, color: color, size: 20),
-                      ),
-                      const Spacer(),
-                      TweenAnimationBuilder<int>(
-                        tween: IntTween(begin: 0, end: count),
-                        duration: Duration(milliseconds: 1000 + delay),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) {
-                          return Text(
-                            '$value',
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Progress indicator
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.0, end: percentage / 100),
-                      duration: Duration(milliseconds: 1200 + delay),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, child) {
-                        return LinearProgressIndicator(
-                          value: value,
-                          minHeight: 4,
-                          backgroundColor: color.withOpacity(0.1),
-                          valueColor: AlwaysStoppedAnimation<Color>(color),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.0, end: percentage),
-                    duration: Duration(milliseconds: 1200 + delay),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) {
-                      return Text(
-                        '${value.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-// Additional Insights Section
-  Widget _buildInsightsSection(Map<String, dynamic> stats) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.insights_rounded,
-                  color: AppTheme.primaryBlue, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Quick Insights',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              if (stats['registrationCompleted'] != null)
-                _buildInsightChip(
-                  icon: Icons.assignment_turned_in_rounded,
-                  label: 'Registration',
-                  value: '${stats['registrationCompleted']}',
-                  color: Colors.blue,
-                ),
-              if (stats['installationCompleted'] != null)
-                _buildInsightChip(
-                  icon: Icons.build_circle_rounded,
-                  label: 'Installation',
-                  value: '${stats['installationCompleted']}',
-                  color: Colors.orange,
-                ),
-              if (stats['hasJansamarth'] != null && stats['hasJansamarth'] > 0)
-                _buildInsightChip(
-                  icon: Icons.description_rounded,
-                  label: 'Jansamarth',
-                  value: '${stats['hasJansamarth']}',
-                  color: Colors.purple,
-                ),
-              if (stats['accountsFirstPaymentCompleted'] != null)
-                _buildInsightChip(
-                  icon: Icons.payment_rounded,
-                  label: 'First Payment',
-                  value: '${stats['accountsFirstPaymentCompleted']}',
-                  color: Colors.green,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInsightChip({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1135,14 +718,6 @@ class _LeadTabState extends ConsumerState<LeadTab> {
 
   Future<void> _initiateCallWithRecording(
       BuildContext context, LeadPool lead) async {
-    // Your existing implementation - copy from above
-  }
-
-  void _showRecordingIndicatorDialog(
-    BuildContext context,
-    LocalCallRecordingService recordingService,
-    LeadPool lead,
-  ) {
     // Your existing implementation - copy from above
   }
 

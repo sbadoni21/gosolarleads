@@ -880,7 +880,8 @@ class GroupInfoScreen extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             member.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 12),
                           ),
                         ),
                         if (isCurrentUser)
@@ -894,7 +895,7 @@ class GroupInfoScreen extends ConsumerWidget {
                             child: const Text(
                               'You',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 8,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.primaryBlue,
                               ),
@@ -902,7 +903,8 @@ class GroupInfoScreen extends ConsumerWidget {
                           ),
                       ],
                     ),
-                    subtitle: Text(member.email),
+                    subtitle:
+                        Text(member.email, style: const TextStyle(fontSize: 8)),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -928,7 +930,7 @@ class GroupInfoScreen extends ConsumerWidget {
                               Text(
                                 _getRoleLabel(role),
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 8,
                                   fontWeight: FontWeight.bold,
                                   color: _getRoleColor(role),
                                 ),

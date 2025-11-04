@@ -5,45 +5,39 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:gosolarleads/models/app_user.dart';
 import 'package:gosolarleads/providers/auth_provider.dart';
-import 'package:gosolarleads/providers/notification_provider.dart';
-import 'package:gosolarleads/screens/notifications_screen.dart';
 import 'package:gosolarleads/services/fcm_service.dart';
 import 'package:gosolarleads/theme/app_theme.dart';
-import 'package:gosolarleads/widgets/notification_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'screens/splash_screen.dart';
 import 'screens/authentication.dart';
 import 'screens/homescreen.dart';
+import 'screens/notifications_screen.dart';
 
+// ✅ Must be a TOP-LEVEL function
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print('📨 Background message: ${message.notification?.title}');
+  print("📨 BG message →  ${message.notification?.title}");
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (Platform.isAndroid) {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: "AIzaSyA2abq5hw-sA-em32MiRzW7DZliVQE1GBM",
-        authDomain: "gosolar-538ba.firebaseapp.com",
-        projectId: "gosolar-538ba",
-        storageBucket: "gosolar-538ba.firebasestorage.app",
-        messagingSenderId: "262021635278",
-        appId: "1:262021635278:web:a4c24a5d086e254d49049f",
-        measurementId: "G-CBLP93NDZ8",
-      ),
-    );
-  } else {
-    await Firebase.initializeApp();
-  }
+  /// ✅ Initialize Firebase
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyA2abq5hw-sA-em32MiRzW7DZliVQE1GBM",
+      authDomain: "gosolar-538ba.firebaseapp.com",
+      projectId: "gosolar-538ba",
+      storageBucket: "gosolar-538ba.firebasestorage.app",   // ✅ your confirmed bucket
+      messagingSenderId: "262021635278",
+      appId: "1:262021635278:web:a4c24a5d086e254d49049f",
+      measurementId: "G-CBLP93NDZ8",
+    ),
+  );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Initialize FCM Service early
-  await FCMService().initialize();
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -58,83 +52,82 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+  late final ProviderSubscription _authListener;
+
   @override
   void initState() {
     super.initState();
-    // Note: ref.listen cannot be called in initState
-    // It will be set up in the build method
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    // Listen to auth state changes and handle FCM accordingly
-    ref.listen<AsyncValue<AppUser?>>(currentUserProvider, (previous, next) async {
+    /// ✅ Listen to authentication safely
+    _authListener =
+        ref.listenManual<AsyncValue<AppUser?>>(currentUserProvider,
+            (previous, next) async {
       next.whenData((user) async {
         if (user != null) {
-          // User logged in
-          print('✅ User logged in: ${user.uid}');
-          
-          // Initialize FCM for this user
+          print("✅ User logged in: ${user.uid}");
+
+          /// ✅ Initialize token AFTER login
           await FCMService().initializeForUser(user.uid);
-          
-          // Optional: Subscribe to user's groups if you have them
-          // You might want to get user's groups from Firestore here
+
           try {
-            final userDoc = await FirebaseFirestore.instance
-                .collection('users')
+            final doc = await FirebaseFirestore.instance
+                .collection("users")
                 .doc(user.uid)
                 .get();
-            
-            final userData = userDoc.data();
-            final groupIds = (userData?['groupIds'] as List?)?.cast<String>() ?? [];
-            
-            if (groupIds.isNotEmpty) {
-              await FCMService().updateGroupSubscriptions(subscribe: groupIds);
+
+            if (doc.exists) {
+              final groupIds =
+                  (doc.data()?["groupIds"] as List?)?.cast<String>() ?? [];
+
+              if (groupIds.isNotEmpty) {
+                await FCMService().updateGroupSubscriptions(subscribe: groupIds);
+              }
             }
           } catch (e) {
-            print('Error subscribing to groups: $e');
+            print("⚠️ Group subscribe error: $e");
           }
-          
         } else {
-          // User logged out
-          print('❌ User logged out');
-          
-          // Clear user presence
-          final previousUser = previous?.value;
-          if (previousUser != null) {
+          print("❌ User logged out");
+
+          final prevUser = previous?.value;
+
+          if (prevUser != null) {
             try {
               await FirebaseFirestore.instance
-                  .collection('user_presence')
-                  .doc(previousUser.uid)
+                  .collection("user_presence")
+                  .doc(prevUser.uid)
                   .set({
-                'activeGroupId': null,
-                'isOnline': false,
-                'lastSeen': FieldValue.serverTimestamp(),
+                "activeGroupId": null,
+                "isOnline": false,
+                "lastSeen": FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
-              
-              print('✅ Presence cleared for user: ${previousUser.uid}');
             } catch (e) {
-              print('Error clearing presence: $e');
+              print("⚠️ Presence clear error: $e");
             }
           }
-          
-          // Optional: Unregister FCM token
-          final token = FCMService().fcmToken;
-          if (token != null) {
-            try {
-              await FCMService().unregisterDeviceToken();
-            } catch (e) {
-              print('Error unregistering token: $e');
-            }
+
+          try {
+            await FCMService().unregisterDeviceToken();
+          } catch (e) {
+            print("⚠️ Token unregister error: $e");
           }
         }
       });
     });
+  }
 
+  @override
+  void dispose() {
+    _authListener.close(); // ✅ Clean listener
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'GoSolar India Leads Pool',
+      title: 'GoSolar India',
       theme: AppTheme.lightTheme,
       initialRoute: '/',
       routes: {

@@ -375,25 +375,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               ),
             ),
 
-            // Version at bottom
-            Positioned(
-              bottom: 30,
-              left: 0,
-              right: 0,
-              child: FadeTransition(
-                opacity: _textFadeAnimation,
-                child: const Center(
-                  child: Text(
-                    'Version 1.0.0',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -403,7 +384,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Widget _buildAnimatedBackground() {
     return Stack(
       children: [
-        // Animated circle 1
         AnimatedBuilder(
           animation: _glowController,
           builder: (context, child) {

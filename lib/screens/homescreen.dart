@@ -6,6 +6,7 @@ import 'package:gosolarleads/screens/accountscreens/accounts_dashboard_screen.da
 import 'package:gosolarleads/screens/authentication.dart';
 import 'package:gosolarleads/screens/installationscreens/installation_screens.dart';
 import 'package:gosolarleads/screens/leads/sales_dashboard_screen.dart';
+import 'package:gosolarleads/screens/leads/stats_screen.dart';
 import 'package:gosolarleads/screens/operations/operation_dashboard_screen.dart';
 import 'package:gosolarleads/screens/privacy_policy.dart';
 import 'package:gosolarleads/screens/refund_policy.dart';
@@ -137,6 +138,12 @@ class Homescreen extends ConsumerWidget {
               text: 'Sales',
               height: 65,
             ),
+          if (isSuperAdmin)
+            const Tab(
+              icon: Icon(Icons.money, size: 20),
+              text: 'Stats',
+              height: 65,
+            ),
           const Tab(
             icon: Icon(Icons.forum_outlined, size: 20),
             text: 'Chat',
@@ -161,6 +168,7 @@ class Homescreen extends ConsumerWidget {
         ];
 
         final views = <Widget>[
+          if (isSuperAdmin) const EnhancedStatsScreen(),
           if (isAccounts) const AccountsDashboardScreen(),
           if (isOperation) const OperationsDashboardScreen(),
           if (isInstallation) const InstallationScreens(),

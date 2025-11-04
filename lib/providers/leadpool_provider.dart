@@ -10,9 +10,35 @@ final leadStreamProvider =
   return ref.read(leadServiceProvider).watchLeadById(leadId);
 });
 // Add this near the top with other providers
-final leadStatisticsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final leadStatisticsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
   return ref.read(leadServiceProvider).getLeadStatistics();
 });
+final roleStatisticsProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, role) async {
+  return ref.read(leadServiceProvider).getRoleSpecificStatistics(role);
+});
+final salesStatisticsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.read(leadServiceProvider).getRoleSpecificStatistics("sales");
+});
+final surveyStatisticsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.read(leadServiceProvider).getRoleSpecificStatistics("survey");
+});
+final installationStatisticsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.read(leadServiceProvider).getRoleSpecificStatistics("installation");
+});
+final operationsStatisticsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.read(leadServiceProvider).getRoleSpecificStatistics("operations");
+});
+final accountsStatisticsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  return ref.read(leadServiceProvider).getRoleSpecificStatistics("accounts");
+});
+
 final leadCommentsProvider =
     StreamProvider.family<List<LeadComment>, String>((ref, leadId) {
   return ref.read(leadServiceProvider).watchComments(leadId);
@@ -83,7 +109,18 @@ final leadServiceProvider = Provider<LeadService>((ref) {
 
 class LeadService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+// Add this method to the LeadService class
+Map<String, dynamic> calculateStatsForLeads(List<LeadPool> leads) {
+  final stats = _initializeStats();
+  
+  for (var lead in leads) {
+    _processLeadStats(lead, stats);
+  }
+  
+  _calculatePercentages(stats);
+  
+  return stats;
+}
   Future<String> addLead(LeadPool lead) async {
     try {
       final docRef = _firestore.collection('lead').doc(lead.uid);
@@ -539,424 +576,589 @@ class LeadService {
         });
   }
 
-// Get comprehensive lead statistics
-  Future<Map<String, dynamic>> getLeadStatistics() async {
-    try {
-      final snapshot = await _firestore.collection('leadPool').get();
+// Enhanced Lead Statistics with Better Organization
+// Add this to your repository/service file
 
-      // Basic counts
-      int total = snapshot.docs.length;
-      int submitted = 0;
-      int pending = 0;
-      int completed = 0;
-      int rejected = 0;
-      int assigned = 0;
-      int unassigned = 0;
+Future<Map<String, dynamic>> getLeadStatistics() async {
+  try {
+    final snapshot = await _firestore.collection('lead').get();
+    
+    // Initialize counters
+    final stats = _initializeStats();
+    
+    // Process all leads in one pass
+    for (var doc in snapshot.docs) {
+      final lead = LeadPool.fromFirestore(doc);
+      _processLeadStats(lead, stats);
+    }
+    
+    // Calculate derived metrics
+    _calculatePercentages(stats);
+    
+    return stats;
+  } catch (e) {
+    throw 'Failed to get statistics: ${e.toString()}';
+  }
+}
 
-      // Assignment tracking
-      int hasOffer = 0;
-      int hasSurvey = 0;
-      int hasInstallation = 0;
-      int hasOperations = 0;
-      int hasAccounts = 0;
+Map<String, dynamic> _initializeStats() {
+  return {
+    // === CORE METRICS ===
+    'total': 0,
+    'submitted': 0,
+    'pending': 0,
+    'completed': 0,
+    'rejected': 0,
+    'assigned': 0,
+    'unassigned': 0,
+    
+    // === WORKFLOW STAGES ===
+    'withOffer': 0,
+    'withSurvey': 0,
+    'withInstallation': 0,
+    'withOperations': 0,
+    'withAccounts': 0,
+    
+    // === REGISTRATION SLA ===
+    'registrationCompleted': 0,
+    'registrationActive': 0,
+    'registrationBreached': 0,
+    'registrationPending': 0,
+    
+    // === INSTALLATION SLA ===
+    'installationCompleted': 0,
+    'installationActive': 0,
+    'installationBreached': 0,
+    'installationPending': 0,
+    
+    // === ACCOUNTS PAYMENTS (NEW STRUCTURE) ===
+    'accountsFirstPaymentCompleted': 0,
+    'accountsFirstPaymentActive': 0,
+    'accountsFirstPaymentBreached': 0,
+    'accountsTotalPaymentCompleted': 0,
+    'accountsTotalPaymentActive': 0,
+    'accountsTotalPaymentBreached': 0,
+    
+    // === DOCUMENTS & SUBMISSIONS ===
+    'surveySubmitted': 0,
+    'surveyDraft': 0,
+    'installationSubmitted': 0,
+    'installationDraft': 0,
+    'operationsSubmitted': 0,
+    'operationsDraft': 0,
+    
+    // === OPERATIONS SPECIFICS ===
+    'withJansamarth': 0,           // Has Jansamarth document
+    'withOperationsPdf1': 0,       // Has operations PDF 1
+    'withOperationsPdf2': 0,       // Has operations PDF 2
+    'fullPaymentMarked': 0,        // Full payment checkbox
+    
+    // === OPERATIONS CHECKBOXES ===
+    'opsModelAgreement': 0,
+    'opsPpa': 0,
+    'opsJirPcrCheck': 0,
+    'opsCompanyLetterHead': 0,
+    'opsTodWarranty': 0,
+    'opsGtp': 0,
+    'opsPlantPhoto': 0,
+    'opsMeterInstallation': 0,
+    'opsStealingReport': 0,
+    'opsJirPcrSigningUpcl': 0,
+    'opsCentralSubsidyRedeem': 0,
+    'opsStateSubsidyApplying': 0,
+    
+    // === TEAM ASSIGNMENTS ===
+    'salesAssigned': 0,
+    'surveyAssigned': 0,
+    'installationAssigned': 0,
+    'operationsAssigned': 0,
+    'accountsAssigned': 0,
+    
+    // === FINANCIAL (Accounts) ===
+    'totalAmountReceived': 0.0,
+    'averageAmountPerLead': 0.0,
+    
+    // === HEALTH METRICS ===
+    'criticalSlaBreaches': 0,      // Any SLA breached
+    'atRiskLeads': 0,              // SLA ending in <3 days
+    'healthyLeads': 0,             // All on track
+  };
+}
 
-      // Registration SLA
-      int registrationCompleted = 0;
-      int registrationActive = 0;
-      int registrationBreached = 0;
+void _processLeadStats(LeadPool lead, Map<String, dynamic> stats) {
+  stats['total']++;
+  
+  // === BASIC STATUS ===
+  switch (lead.status.toLowerCase().trim()) {
+    case 'submitted':
+      stats['submitted']++;
+      break;
+    case 'pending':
+      stats['pending']++;
+      break;
+    case 'completed':
+      stats['completed']++;
+      break;
+    case 'rejected':
+      stats['rejected']++;
+      break;
+  }
+  
+  // === ASSIGNMENT ===
+  if (lead.isAssigned) {
+    stats['assigned']++;
+    stats['salesAssigned']++;
+  } else {
+    stats['unassigned']++;
+  }
+  
+  // === WORKFLOW STAGES ===
+  if (lead.hasOffer) stats['withOffer']++;
+  if (lead.hasSurvey) stats['withSurvey']++;
+  if (lead.installation != null) stats['withInstallation']++;
+  if (lead.operations != null) stats['withOperations']++;
+  if (lead.accounts != null) stats['withAccounts']++;
+  
+  // === REGISTRATION SLA ===
+  if (lead.registrationCompletedAt != null) {
+    stats['registrationCompleted']++;
+  } else if (lead.isRegistrationSlaActive) {
+    stats['registrationActive']++;
+    if (lead.isRegistrationSlaBreached) {
+      stats['registrationBreached']++;
+    }
+  } else {
+    stats['registrationPending']++;
+  }
+  
+  // === INSTALLATION SLA ===
+  if (lead.installationCompletedAt != null) {
+    stats['installationCompleted']++;
+  } else if (lead.isInstallationSlaActive) {
+    stats['installationActive']++;
+    if (lead.isInstallationSlaBreached) {
+      stats['installationBreached']++;
+    }
+  } else {
+    stats['installationPending']++;
+  }
+  
+  // === ACCOUNTS PAYMENTS ===
+  // First Payment (7 days)
+  if (lead.accountsFirstPaymentCompletedAt != null) {
+    stats['accountsFirstPaymentCompleted']++;
+  } else if (lead.isAccountsFirstPaymentSlaActive) {
+    stats['accountsFirstPaymentActive']++;
+    if (lead.isAccountsFirstPaymentSlaBreached) {
+      stats['accountsFirstPaymentBreached']++;
+    }
+  }
+  
+  // Total Payment (30 days)
+  if (lead.accountsTotalPaymentCompletedAt != null) {
+    stats['accountsTotalPaymentCompleted']++;
+  } else if (lead.isAccountsTotalPaymentSlaActive) {
+    stats['accountsTotalPaymentActive']++;
+    if (lead.isAccountsTotalPaymentSlaBreached) {
+      stats['accountsTotalPaymentBreached']++;
+    }
+  }
+  
+  // === SURVEY ===
+  if (lead.survey != null) {
+    stats['surveyAssigned']++;
+    if (lead.survey!.isSubmitted) {
+      stats['surveySubmitted']++;
+    } else {
+      stats['surveyDraft']++;
+    }
+  }
+  
+  // === INSTALLATION ===
+  if (lead.installationAssignedTo?.isNotEmpty ?? false) {
+    stats['installationAssigned']++;
+  }
+  if (lead.installation != null) {
+    if (lead.installation!.isSubmitted) {
+      stats['installationSubmitted']++;
+    } else {
+      stats['installationDraft']++;
+    }
+  }
+  
+  // === OPERATIONS (ENHANCED) ===
+  if (lead.operationsAssignedTo?.isNotEmpty ?? false) {
+    stats['operationsAssigned']++;
+  }
+  
+  if (lead.operations != null) {
+    final ops = lead.operations!;
+    
+    // Submission status
+    if (ops.isSubmitted) {
+      stats['operationsSubmitted']++;
+    } else {
+      stats['operationsDraft']++;
+    }
+    
+    // 🔥 DOCUMENTS (including Jansamarth)
+    if (ops.jansamarthPdfUrl?.isNotEmpty ?? false) {
+      stats['withJansamarth']++;
+    }
+    if (ops.operationPdf1Url?.isNotEmpty ?? false) {
+      stats['withOperationsPdf1']++;
+    }
+    if (ops.operationPdf2Url?.isNotEmpty ?? false) {
+      stats['withOperationsPdf2']++;
+    }
+    
+    // 🔥 CHECKBOXES
+    final checks = ops.checkboxes;
+    if (checks.fullPayment) stats['fullPaymentMarked']++;
+    if (checks.modelAgreement) stats['opsModelAgreement']++;
+    if (checks.ppa) stats['opsPpa']++;
+    if (checks.jirPcrCheck) stats['opsJirPcrCheck']++;
+    if (checks.companyLetterHead) stats['opsCompanyLetterHead']++;
+    if (checks.todWarranty) stats['opsTodWarranty']++;
+    if (checks.gtp) stats['opsGtp']++;
+    if (checks.plantPhoto) stats['opsPlantPhoto']++;
+    if (checks.meterInstallation) stats['opsMeterInstallation']++;
+    if (checks.stealingReport) stats['opsStealingReport']++;
+    if (checks.jirPcrSigningUpcl) stats['opsJirPcrSigningUpcl']++;
+    if (checks.centralSubsidyRedeem) stats['opsCentralSubsidyRedeem']++;
+    if (checks.stateSubsidyApplying) stats['opsStateSubsidyApplying']++;
+  }
+  
+  // === ACCOUNTS ===
+  if (lead.accountsAssignedTo?.isNotEmpty ?? false) {
+    stats['accountsAssigned']++;
+  }
+  
+  if (lead.accounts != null) {
+    stats['totalAmountReceived'] += lead.accounts!.totalPaid;
+  }
+  
+  // === HEALTH METRICS ===
+  bool hasBreach = lead.isRegistrationSlaBreached || 
+                   lead.isInstallationSlaBreached ||
+                   lead.isAccountsFirstPaymentSlaBreached ||
+                   lead.isAccountsTotalPaymentSlaBreached;
+  
+  bool atRisk = (lead.registrationDaysRemaining > 0 && lead.registrationDaysRemaining <= 3) ||
+                (lead.installationDaysRemaining > 0 && lead.installationDaysRemaining <= 3) ||
+                (lead.accountsFirstPaymentDaysRemaining > 0 && lead.accountsFirstPaymentDaysRemaining <= 3) ||
+                (lead.accountsTotalPaymentDaysRemaining > 0 && lead.accountsTotalPaymentDaysRemaining <= 3);
+  
+  if (hasBreach) {
+    stats['criticalSlaBreaches']++;
+  } else if (atRisk) {
+    stats['atRiskLeads']++;
+  } else {
+    stats['healthyLeads']++;
+  }
+}
 
-      // Installation SLA
-      int installationCompleted = 0;
-      int installationActive = 0;
-      int installationBreached = 0;
+void _calculatePercentages(Map<String, dynamic> stats) {
+  final total = stats['total'] as int;
+  
+  if (total == 0) return;
+  
+  // Helper function
+  String pct(int value) => (value / total * 100).toStringAsFixed(1);
+  
+  stats['assignmentRate'] = pct(stats['assigned']);
+  stats['completionRate'] = pct(stats['completed']);
+  
+  // Workflow completion rates
+  stats['offerRate'] = pct(stats['withOffer']);
+  stats['surveyRate'] = pct(stats['withSurvey']);
+  stats['installationRate'] = pct(stats['withInstallation']);
+  stats['operationsRate'] = pct(stats['withOperations']);
+  stats['accountsRate'] = pct(stats['withAccounts']);
+  
+  // SLA rates
+  stats['registrationCompletionRate'] = pct(stats['registrationCompleted']);
+  stats['registrationBreachRate'] = pct(stats['registrationBreached']);
+  stats['installationCompletionRate'] = pct(stats['installationCompleted']);
+  stats['installationBreachRate'] = pct(stats['installationBreached']);
+  
+  // Accounts payment rates
+  stats['firstPaymentCompletionRate'] = pct(stats['accountsFirstPaymentCompleted']);
+  stats['firstPaymentBreachRate'] = pct(stats['accountsFirstPaymentBreached']);
+  stats['totalPaymentCompletionRate'] = pct(stats['accountsTotalPaymentCompleted']);
+  stats['totalPaymentBreachRate'] = pct(stats['accountsTotalPaymentBreached']);
+  
+  // Operations document rates
+  stats['jansamarthRate'] = pct(stats['withJansamarth']);
+  stats['operationsPdf1Rate'] = pct(stats['withOperationsPdf1']);
+  stats['operationsPdf2Rate'] = pct(stats['withOperationsPdf2']);
+  stats['fullPaymentRate'] = pct(stats['fullPaymentMarked']);
+  
+  // Survey submission rate
+  final surveyAssigned = stats['surveyAssigned'] as int;
+  if (surveyAssigned > 0) {
+    stats['surveySubmissionRate'] = 
+      (stats['surveySubmitted'] / surveyAssigned * 100).toStringAsFixed(1);
+  }
+  
+  // Installation submission rate
+  final installationAssigned = stats['installationAssigned'] as int;
+  if (installationAssigned > 0) {
+    stats['installationSubmissionRate'] = 
+      (stats['installationSubmitted'] / installationAssigned * 100).toStringAsFixed(1);
+  }
+  
+  // Operations submission rate
+  final operationsAssigned = stats['operationsAssigned'] as int;
+  if (operationsAssigned > 0) {
+    stats['operationsSubmissionRate'] = 
+      (stats['operationsSubmitted'] / operationsAssigned * 100).toStringAsFixed(1);
+  }
+  
+  // Financial
+  stats['averageAmountPerLead'] = 
+    (stats['totalAmountReceived'] / total).toStringAsFixed(2);
+  
+  // Health metrics
+  stats['criticalBreachRate'] = pct(stats['criticalSlaBreaches']);
+  stats['atRiskRate'] = pct(stats['atRiskLeads']);
+  stats['healthyRate'] = pct(stats['healthyLeads']);
+}
 
-      // Operations specific
-      int hasJansamarth = 0;
-      int hasFullPayment = 0;
+// === ENHANCED ROLE-SPECIFIC STATISTICS ===
 
-      // Accounts SLA
-      int accountsFirstPaymentCompleted = 0;
-      int accountsTotalPaymentCompleted = 0;
-      int accountsFirstPaymentBreached = 0;
-      int accountsTotalPaymentBreached = 0;
+Future<Map<String, dynamic>> getRoleSpecificStatistics(String role) async {
+  try {
+    final snapshot = await _firestore.collection('lead').get();
+    
+    switch (role.toLowerCase()) {
+      case 'sales':
+        return _getSalesStatistics(snapshot);
+      case 'survey':
+        return _getSurveyStatistics(snapshot);
+      case 'installation':
+        return _getInstallationStatistics(snapshot);
+      case 'operations':
+        return _getOperationsStatistics(snapshot);
+      case 'accounts':
+        return _getAccountsStatistics(snapshot);
+      default:
+        return getLeadStatistics();
+    }
+  } catch (e) {
+    throw 'Failed to get role statistics: ${e.toString()}';
+  }
+}
 
-      // Survey specific
-      int surveySubmitted = 0;
+Map<String, dynamic> _getSalesStatistics(QuerySnapshot snapshot) {
+  int total = snapshot.docs.length;
+  int assigned = 0, unassigned = 0;
+  int withOffer = 0, withSurvey = 0;
+  int registrationCompleted = 0, registrationActive = 0, registrationBreached = 0;
+  
+  for (var doc in snapshot.docs) {
+    final lead = LeadPool.fromFirestore(doc);
+    
+    if (lead.isAssigned) {
+      assigned++;
+    } else {
+      unassigned++;
+    }
+    
+    if (lead.hasOffer) withOffer++;
+    if (lead.hasSurvey) withSurvey++;
+    
+    if (lead.registrationCompletedAt != null) {
+      registrationCompleted++;
+    } else if (lead.isRegistrationSlaActive) {
+      registrationActive++;
+      if (lead.isRegistrationSlaBreached) registrationBreached++;
+    }
+  }
+  
+  return {
+    'totalLeads': total,
+    'assigned': assigned,
+    'unassigned': unassigned,
+    'withOffer': withOffer,
+    'withSurvey': withSurvey,
+    'registrationCompleted': registrationCompleted,
+    'registrationActive': registrationActive,
+    'registrationBreached': registrationBreached,
+    'assignmentRate': total > 0 ? (assigned / total * 100).toStringAsFixed(1) : '0',
+    'offerRate': total > 0 ? (withOffer / total * 100).toStringAsFixed(1) : '0',
+    'surveyRate': total > 0 ? (withSurvey / total * 100).toStringAsFixed(1) : '0',
+    'registrationRate': total > 0 ? (registrationCompleted / total * 100).toStringAsFixed(1) : '0',
+  };
+}
 
-      // Installation assignments
-      int installationAssigned = 0;
-      int operationsAssigned = 0;
-      int accountsAssigned = 0;
+Map<String, dynamic> _getSurveyStatistics(QuerySnapshot snapshot) {
+  int assigned = 0, submitted = 0, draft = 0;
+  
+  for (var doc in snapshot.docs) {
+    final lead = LeadPool.fromFirestore(doc);
+    if (lead.survey != null) {
+      assigned++;
+      if (lead.survey!.isSubmitted) {
+        submitted++;
+      } else {
+        draft++;
+      }
+    }
+  }
+  
+  return {
+    'totalAssigned': assigned,
+    'submitted': submitted,
+    'draft': draft,
+    'submissionRate': assigned > 0 ? (submitted / assigned * 100).toStringAsFixed(1) : '0',
+  };
+}
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final lead = LeadPool.fromFirestore(doc);
-
-        // Basic status
-        final status = (data['status']?.toString() ?? '').toLowerCase();
-        switch (status) {
-          case 'submitted':
-            submitted++;
-            break;
-          case 'pending':
-            pending++;
-            break;
-          case 'completed':
-            completed++;
-            break;
-          case 'rejected':
-            rejected++;
-            break;
-        }
-
-        // Assignment
-        if (lead.isAssigned) {
-          assigned++;
+Map<String, dynamic> _getInstallationStatistics(QuerySnapshot snapshot) {
+  int assigned = 0, completed = 0;
+  int slaActive = 0, slaBreached = 0;
+  int submitted = 0, draft = 0;
+  
+  for (var doc in snapshot.docs) {
+    final lead = LeadPool.fromFirestore(doc);
+    
+    if (lead.installationAssignedTo?.isNotEmpty ?? false) {
+      assigned++;
+      
+      if (lead.installationCompletedAt != null) {
+        completed++;
+      } else if (lead.isInstallationSlaActive) {
+        slaActive++;
+        if (lead.isInstallationSlaBreached) slaBreached++;
+      }
+      
+      if (lead.installation != null) {
+        if (lead.installation!.isSubmitted) {
+          submitted++;
         } else {
-          unassigned++;
-        }
-
-        // Data objects
-        if (lead.hasOffer) hasOffer++;
-        if (lead.hasSurvey) hasSurvey++;
-        if (lead.installation != null) hasInstallation++;
-        if (lead.operations != null) hasOperations++;
-        if (lead.accounts != null) hasAccounts++;
-
-        // Registration SLA
-        if (lead.registrationCompletedAt != null) {
-          registrationCompleted++;
-        } else if (lead.isRegistrationSlaActive) {
-          registrationActive++;
-          if (lead.isRegistrationSlaBreached) {
-            registrationBreached++;
-          }
-        }
-
-        // Installation SLA
-        if (lead.installationCompletedAt != null) {
-          installationCompleted++;
-        } else if (lead.isInstallationSlaActive) {
-          installationActive++;
-          if (lead.isInstallationSlaBreached) {
-            installationBreached++;
-          }
-        }
-
-        // Operations checks
-        if (lead.operations != null) {
-          final ops = lead.operations!;
-          if (ops.jansamarthPdfUrl?.isNotEmpty ?? false) {
-            hasJansamarth++;
-          }
-          if (ops.checkboxes.fullPayment) {
-            hasFullPayment++;
-          }
-        }
-
-        // Accounts payments
-        if (lead.accountsFirstPaymentCompletedAt != null) {
-          accountsFirstPaymentCompleted++;
-        }
-        if (lead.accountsTotalPaymentCompletedAt != null) {
-          accountsTotalPaymentCompleted++;
-        }
-        if (lead.isAccountsFirstPaymentSlaBreached) {
-          accountsFirstPaymentBreached++;
-        }
-        if (lead.isAccountsTotalPaymentSlaBreached) {
-          accountsTotalPaymentBreached++;
-        }
-
-        // Survey status
-        if (lead.survey?.isSubmitted ?? false) {
-          surveySubmitted++;
-        }
-
-        // Team assignments
-        if (lead.installationAssignedTo?.isNotEmpty ?? false) {
-          installationAssigned++;
-        }
-        if (lead.operationsAssignedTo?.isNotEmpty ?? false) {
-          operationsAssigned++;
-        }
-        if (lead.accountsAssignedTo?.isNotEmpty ?? false) {
-          accountsAssigned++;
+          draft++;
         }
       }
-
-      return {
-        // Basic Stats
-        'total': total,
-        'submitted': submitted,
-        'pending': pending,
-        'completed': completed,
-        'rejected': rejected,
-        'assigned': assigned,
-        'unassigned': unassigned,
-
-        // Data Objects
-        'hasOffer': hasOffer,
-        'hasSurvey': hasSurvey,
-        'hasInstallation': hasInstallation,
-        'hasOperations': hasOperations,
-        'hasAccounts': hasAccounts,
-
-        // Registration SLA
-        'registrationCompleted': registrationCompleted,
-        'registrationActive': registrationActive,
-        'registrationBreached': registrationBreached,
-
-        // Installation SLA
-        'installationCompleted': installationCompleted,
-        'installationActive': installationActive,
-        'installationBreached': installationBreached,
-
-        // Operations
-        'hasJansamarth': hasJansamarth,
-        'hasFullPayment': hasFullPayment,
-
-        // Accounts Payments
-        'accountsFirstPaymentCompleted': accountsFirstPaymentCompleted,
-        'accountsTotalPaymentCompleted': accountsTotalPaymentCompleted,
-        'accountsFirstPaymentBreached': accountsFirstPaymentBreached,
-        'accountsTotalPaymentBreached': accountsTotalPaymentBreached,
-
-        // Survey
-        'surveySubmitted': surveySubmitted,
-
-        // Team Assignments
-        'installationAssigned': installationAssigned,
-        'operationsAssigned': operationsAssigned,
-        'accountsAssigned': accountsAssigned,
-
-        // Calculated percentages (useful for dashboards)
-        'assignmentRate':
-            total > 0 ? (assigned / total * 100).toStringAsFixed(1) : '0',
-        'registrationCompletionRate': total > 0
-            ? (registrationCompleted / total * 100).toStringAsFixed(1)
-            : '0',
-        'installationCompletionRate': total > 0
-            ? (installationCompleted / total * 100).toStringAsFixed(1)
-            : '0',
-        'jansamarthRate':
-            total > 0 ? (hasJansamarth / total * 100).toStringAsFixed(1) : '0',
-        'firstPaymentRate': total > 0
-            ? (accountsFirstPaymentCompleted / total * 100).toStringAsFixed(1)
-            : '0',
-        'totalPaymentRate': total > 0
-            ? (accountsTotalPaymentCompleted / total * 100).toStringAsFixed(1)
-            : '0',
-      };
-    } catch (e) {
-      throw 'Failed to get statistics: ${e.toString()}';
     }
   }
+  
+  return {
+    'totalAssigned': assigned,
+    'completed': completed,
+    'submitted': submitted,
+    'draft': draft,
+    'slaActive': slaActive,
+    'slaBreached': slaBreached,
+    'completionRate': assigned > 0 ? (completed / assigned * 100).toStringAsFixed(1) : '0',
+    'submissionRate': assigned > 0 ? (submitted / assigned * 100).toStringAsFixed(1) : '0',
+    'breachRate': slaActive > 0 ? (slaBreached / slaActive * 100).toStringAsFixed(1) : '0',
+  };
+}
 
-// Get statistics by role (for role-specific dashboards)
-  Future<Map<String, dynamic>> getRoleSpecificStatistics(String role) async {
-    try {
-      final snapshot = await _firestore.collection('leadPool').get();
-
-      switch (role.toLowerCase()) {
-        case 'sales':
-          return _getSalesStatistics(snapshot);
-        case 'survey':
-          return _getSurveyStatistics(snapshot);
-        case 'installation':
-          return _getInstallationStatistics(snapshot);
-        case 'operations':
-          return _getOperationsStatistics(snapshot);
-        case 'accounts':
-          return _getAccountsStatistics(snapshot);
-        default:
-          return getLeadStatistics();
-      }
-    } catch (e) {
-      throw 'Failed to get role statistics: ${e.toString()}';
-    }
-  }
-
-  Map<String, dynamic> _getSalesStatistics(QuerySnapshot snapshot) {
-    int totalLeads = snapshot.docs.length;
-    int withOffer = 0;
-    int withSurvey = 0;
-    int registered = 0;
-
-    for (var doc in snapshot.docs) {
-      final lead = LeadPool.fromFirestore(doc);
-      if (lead.hasOffer) withOffer++;
-      if (lead.hasSurvey) withSurvey++;
-      if (lead.registrationCompletedAt != null) registered++;
-    }
-
-    return {
-      'totalLeads': totalLeads,
-      'withOffer': withOffer,
-      'withSurvey': withSurvey,
-      'registered': registered,
-      'offerRate': totalLeads > 0
-          ? (withOffer / totalLeads * 100).toStringAsFixed(1)
-          : '0',
-      'surveyRate': totalLeads > 0
-          ? (withSurvey / totalLeads * 100).toStringAsFixed(1)
-          : '0',
-      'registrationRate': totalLeads > 0
-          ? (registered / totalLeads * 100).toStringAsFixed(1)
-          : '0',
-    };
-  }
-
-  Map<String, dynamic> _getSurveyStatistics(QuerySnapshot snapshot) {
-    int totalAssigned = 0;
-    int surveysSubmitted = 0;
-    int surveysDraft = 0;
-
-    for (var doc in snapshot.docs) {
-      final lead = LeadPool.fromFirestore(doc);
-      if (lead.hasSurvey) {
-        totalAssigned++;
-        if (lead.survey!.isSubmitted) {
-          surveysSubmitted++;
+Map<String, dynamic> _getOperationsStatistics(QuerySnapshot snapshot) {
+  int assigned = 0, submitted = 0, draft = 0;
+  int withJansamarth = 0, withPdf1 = 0, withPdf2 = 0;
+  int fullPayment = 0;
+  Map<String, int> checkboxStats = {};
+  
+  for (var doc in snapshot.docs) {
+    final lead = LeadPool.fromFirestore(doc);
+    
+    if (lead.operationsAssignedTo?.isNotEmpty ?? false) {
+      assigned++;
+      
+      if (lead.operations != null) {
+        final ops = lead.operations!;
+        
+        if (ops.isSubmitted) {
+          submitted++;
         } else {
-          surveysDraft++;
+          draft++;
         }
+        
+        // Documents
+        if (ops.jansamarthPdfUrl?.isNotEmpty ?? false) withJansamarth++;
+        if (ops.operationPdf1Url?.isNotEmpty ?? false) withPdf1++;
+        if (ops.operationPdf2Url?.isNotEmpty ?? false) withPdf2++;
+        
+        // Checkboxes
+        final c = ops.checkboxes;
+        if (c.fullPayment) fullPayment++;
+        checkboxStats['modelAgreement'] = (checkboxStats['modelAgreement'] ?? 0) + (c.modelAgreement ? 1 : 0);
+        checkboxStats['ppa'] = (checkboxStats['ppa'] ?? 0) + (c.ppa ? 1 : 0);
+        checkboxStats['jirPcrCheck'] = (checkboxStats['jirPcrCheck'] ?? 0) + (c.jirPcrCheck ? 1 : 0);
+        checkboxStats['centralSubsidy'] = (checkboxStats['centralSubsidy'] ?? 0) + (c.centralSubsidyRedeem ? 1 : 0);
+        checkboxStats['stateSubsidy'] = (checkboxStats['stateSubsidy'] ?? 0) + (c.stateSubsidyApplying ? 1 : 0);
       }
     }
-
-    return {
-      'totalAssigned': totalAssigned,
-      'surveysSubmitted': surveysSubmitted,
-      'surveysDraft': surveysDraft,
-      'completionRate': totalAssigned > 0
-          ? (surveysSubmitted / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-    };
   }
+  
+  return {
+    'totalAssigned': assigned,
+    'submitted': submitted,
+    'draft': draft,
+    'withJansamarth': withJansamarth,
+    'withPdf1': withPdf1,
+    'withPdf2': withPdf2,
+    'fullPaymentMarked': fullPayment,
+    'submissionRate': assigned > 0 ? (submitted / assigned * 100).toStringAsFixed(1) : '0',
+    'jansamarthRate': assigned > 0 ? (withJansamarth / assigned * 100).toStringAsFixed(1) : '0',
+    'fullPaymentRate': assigned > 0 ? (fullPayment / assigned * 100).toStringAsFixed(1) : '0',
+    ...checkboxStats,
+  };
+}
 
-  Map<String, dynamic> _getInstallationStatistics(QuerySnapshot snapshot) {
-    int totalAssigned = 0;
-    int installationComplete = 0;
-    int slaActive = 0;
-    int slaBreached = 0;
-
-    for (var doc in snapshot.docs) {
-      final lead = LeadPool.fromFirestore(doc);
-      if (lead.installationAssignedTo?.isNotEmpty ?? false) {
-        totalAssigned++;
-        if (lead.installationCompletedAt != null) {
-          installationComplete++;
-        } else if (lead.isInstallationSlaActive) {
-          slaActive++;
-          if (lead.isInstallationSlaBreached) {
-            slaBreached++;
-          }
-        }
+Map<String, dynamic> _getAccountsStatistics(QuerySnapshot snapshot) {
+  int assigned = 0;
+  int firstPaymentDone = 0, totalPaymentDone = 0;
+  int firstPaymentActive = 0, firstPaymentBreached = 0;
+  int totalPaymentActive = 0, totalPaymentBreached = 0;
+  double totalAmount = 0.0;
+  
+  for (var doc in snapshot.docs) {
+    final lead = LeadPool.fromFirestore(doc);
+    
+    if (lead.accountsAssignedTo?.isNotEmpty ?? false) {
+      assigned++;
+      
+      // First payment
+      if (lead.accountsFirstPaymentCompletedAt != null) {
+        firstPaymentDone++;
+      } else if (lead.isAccountsFirstPaymentSlaActive) {
+        firstPaymentActive++;
+        if (lead.isAccountsFirstPaymentSlaBreached) firstPaymentBreached++;
+      }
+      
+      // Total payment
+      if (lead.accountsTotalPaymentCompletedAt != null) {
+        totalPaymentDone++;
+      } else if (lead.isAccountsTotalPaymentSlaActive) {
+        totalPaymentActive++;
+        if (lead.isAccountsTotalPaymentSlaBreached) totalPaymentBreached++;
+      }
+      
+      if (lead.accounts != null) {
+        totalAmount += lead.accounts!.totalPaid;
       }
     }
-
-    return {
-      'totalAssigned': totalAssigned,
-      'installationComplete': installationComplete,
-      'slaActive': slaActive,
-      'slaBreached': slaBreached,
-      'completionRate': totalAssigned > 0
-          ? (installationComplete / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-      'breachRate': slaActive > 0
-          ? (slaBreached / slaActive * 100).toStringAsFixed(1)
-          : '0',
-    };
   }
+  
+  return {
+    'totalAssigned': assigned,
+    'firstPaymentDone': firstPaymentDone,
+    'firstPaymentActive': firstPaymentActive,
+    'firstPaymentBreached': firstPaymentBreached,
+    'totalPaymentDone': totalPaymentDone,
+    'totalPaymentActive': totalPaymentActive,
+    'totalPaymentBreached': totalPaymentBreached,
+    'totalAmountReceived': totalAmount.toStringAsFixed(2),
+    'averageAmount': assigned > 0 ? (totalAmount / assigned).toStringAsFixed(2) : '0',
+    'firstPaymentRate': assigned > 0 ? (firstPaymentDone / assigned * 100).toStringAsFixed(1) : '0',
+    'totalPaymentRate': assigned > 0 ? (totalPaymentDone / assigned * 100).toStringAsFixed(1) : '0',
+    'firstPaymentBreachRate': assigned > 0 ? (firstPaymentBreached / assigned * 100).toStringAsFixed(1) : '0',
+    'totalPaymentBreachRate': assigned > 0 ? (totalPaymentBreached / assigned * 100).toStringAsFixed(1) : '0',
+  };
+}
 
-  Map<String, dynamic> _getOperationsStatistics(QuerySnapshot snapshot) {
-    int totalAssigned = 0;
-    int opsSubmitted = 0;
-    int withJansamarth = 0;
-    int fullPaymentMarked = 0;
-
-    for (var doc in snapshot.docs) {
-      final lead = LeadPool.fromFirestore(doc);
-      if (lead.operationsAssignedTo?.isNotEmpty ?? false) {
-        totalAssigned++;
-        if (lead.operations?.isSubmitted ?? false) {
-          opsSubmitted++;
-        }
-        if (lead.operations?.jansamarthPdfUrl?.isNotEmpty ?? false) {
-          withJansamarth++;
-        }
-        if (lead.operations?.checkboxes.fullPayment ?? false) {
-          fullPaymentMarked++;
-        }
-      }
-    }
-
-    return {
-      'totalAssigned': totalAssigned,
-      'opsSubmitted': opsSubmitted,
-      'withJansamarth': withJansamarth,
-      'fullPaymentMarked': fullPaymentMarked,
-      'submissionRate': totalAssigned > 0
-          ? (opsSubmitted / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-      'jansamarthRate': totalAssigned > 0
-          ? (withJansamarth / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-    };
-  }
-
-  Map<String, dynamic> _getAccountsStatistics(QuerySnapshot snapshot) {
-    int totalAssigned = 0;
-    int firstPaymentDone = 0;
-    int totalPaymentDone = 0;
-    int firstPaymentBreached = 0;
-    int totalPaymentBreached = 0;
-    double totalAmountReceived = 0.0;
-
-    for (var doc in snapshot.docs) {
-      final lead = LeadPool.fromFirestore(doc);
-      if (lead.accountsAssignedTo?.isNotEmpty ?? false) {
-        totalAssigned++;
-
-        if (lead.accountsFirstPaymentCompletedAt != null) {
-          firstPaymentDone++;
-        }
-        if (lead.accountsTotalPaymentCompletedAt != null) {
-          totalPaymentDone++;
-        }
-        if (lead.isAccountsFirstPaymentSlaBreached) {
-          firstPaymentBreached++;
-        }
-        if (lead.isAccountsTotalPaymentSlaBreached) {
-          totalPaymentBreached++;
-        }
-
-        // Calculate total amount received
-        if (lead.accounts != null) {
-          totalAmountReceived += lead.accounts!.totalPaid;
-        }
-      }
-    }
-
-    return {
-      'totalAssigned': totalAssigned,
-      'firstPaymentDone': firstPaymentDone,
-      'totalPaymentDone': totalPaymentDone,
-      'firstPaymentBreached': firstPaymentBreached,
-      'totalPaymentBreached': totalPaymentBreached,
-      'totalAmountReceived': totalAmountReceived.toStringAsFixed(2),
-      'firstPaymentRate': totalAssigned > 0
-          ? (firstPaymentDone / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-      'totalPaymentRate': totalAssigned > 0
-          ? (totalPaymentDone / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-      'firstPaymentBreachRate': totalAssigned > 0
-          ? (firstPaymentBreached / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-      'totalPaymentBreachRate': totalAssigned > 0
-          ? (totalPaymentBreached / totalAssigned * 100).toStringAsFixed(1)
-          : '0',
-    };
-  }
 }
