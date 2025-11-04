@@ -39,6 +39,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   String? _uploadedIconUrl;
   bool _uploadingIcon = false;
 
+  int _currentStep = 0;
+
   final List<String> _availableStates = ['Uttarakhand', 'Uttar Pradesh'];
 
   final Map<String, List<String>> _stateDistricts = {
@@ -142,22 +144,18 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     _loadUsers();
   }
 
-// Normalize role to a simple lowercase token ("admin", "sales", etc.)
   String _normRole(String? r) {
     final v = (r ?? '').trim().toLowerCase();
-    // map common variants if needed
     if (v == 'administrator') return 'admin';
     if (v == 'sale' || v == 'salesperson' || v == 'sales person')
       return 'sales';
     return v;
   }
 
-// Returns selected users + current user (so creator counts toward role check)
   List<Map<String, String>> _selectedUsersIncludingMe() {
     final me = ref.read(currentUserProvider).value;
     final List<Map<String, String>> list = [];
 
-    // add current user as map (try to find role from _allUsers if not on currentUser)
     if (me != null) {
       final meFromList = _allUsers.firstWhere(
         (u) => (u['uid'] ?? '').trim() == me.uid,
@@ -167,12 +165,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         'uid': me.uid,
         'name': me.name,
         'email': me.email,
-        'role':
-            meFromList['role'] ?? (me.role ?? ''), // use me.role if you have it
+        'role': meFromList['role'] ?? (me.role ?? ''),
       });
     }
 
-    // add selected users
     for (final id in _selectedUserIds) {
       final u = _allUsers.firstWhere(
         (x) => (x['uid'] ?? '').trim() == id,
@@ -184,7 +180,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     return list;
   }
 
-// Validate that we have at least one admin and one sales
   bool _hasRequiredRoles() {
     final sel = _selectedUsersIncludingMe();
     bool hasAdmin = false, hasSales = false;
@@ -290,6 +285,19 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     }
   }
 
+  bool _canProceedToStep(int step) {
+    switch (step) {
+      case 1:
+        return _nameController.text.trim().isNotEmpty;
+      case 2:
+        return _selectedState != null && _selectedDistricts.isNotEmpty;
+      case 3:
+        return true;
+      default:
+        return true;
+    }
+  }
+
   Future<void> _createGroup() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -306,7 +314,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       );
       return;
     }
-// NEW: role validation
+
     if (!_hasRequiredRoles()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -316,7 +324,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                    'Each group must include at least 1 Admin and 1 Sales member (creator counts).'),
+                    'Group must include at least 1 Admin and 1 Sales member'),
               ),
             ],
           ),
@@ -379,7 +387,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         createdBy: currentUser.email,
         members: members,
         groupIcon: iconUrl,
-        memberIds: [..._selectedUserIds, currentUser.uid], // NEW FIELD
+        memberIds: [..._selectedUserIds, currentUser.uid],
       );
 
       if (mounted) {
@@ -427,22 +435,16 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   List<Map<String, String>> get _filteredUsers {
     final q = _memberSearchController.text.trim().toLowerCase();
     if (q.isEmpty) return _allUsers;
-    print(_allUsers);
     return _allUsers.where((u) {
       final n = (u['name'] ?? '').toLowerCase();
       final e = (u['email'] ?? '').toLowerCase();
       final r = (u['role'] ?? '').toLowerCase();
-
-      return n.contains(q) || e.contains(q) || r.contains(q); // ← NEW
+      return n.contains(q) || e.contains(q) || r.contains(q);
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<String> districts = _selectedState == null
-        ? const <String>[]
-        : (_stateDistricts[_selectedState] ?? const <String>[]);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Group'),
@@ -451,695 +453,1130 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            // Group Icon
-            Center(
-              child: Stack(
+            // Progress Indicator
+            _buildProgressIndicator(),
+
+            // Content
+            Expanded(
+              child: IndexedStack(
+                index: _currentStep,
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
-                    backgroundImage:
-                        _iconBytes != null ? MemoryImage(_iconBytes!) : null,
-                    child: (_iconBytes == null &&
-                            _iconFile == null &&
-                            _uploadedIconUrl == null)
-                        ? const Icon(Icons.group,
-                            size: 50, color: AppTheme.primaryBlue)
-                        : (_uploadedIconUrl != null
-                            ? ClipOval(
-                                child: Image.network(
-                                  _uploadedIconUrl!,
-                                  width: 100,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.broken_image),
-                                ),
-                              )
-                            : null),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: InkWell(
-                      onTap: _uploadingIcon ? null : _pickGroupIcon,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _uploadingIcon
-                              ? Colors.grey
-                              : AppTheme.primaryBlue,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: _uploadingIcon
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.camera_alt,
-                                size: 18, color: Colors.white),
-                      ),
-                    ),
-                  ),
+                  _buildStep1BasicInfo(),
+                  _buildStep2Location(),
+                  _buildStep3Members(),
                 ],
               ),
             ),
-            const SizedBox(height: 32),
 
-            // Group Name
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'Group Name *',
-                hintText: 'Enter group name',
-                prefixIcon: const Icon(Icons.group_outlined),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey.withOpacity(0.05),
-              ),
-              validator: (value) => (value == null || value.isEmpty)
-                  ? 'Please enter group name'
-                  : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Description
-            TextFormField(
-              controller: _descriptionController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Description',
-                hintText: 'Brief description about the group',
-                prefixIcon: const Icon(Icons.description_outlined),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey.withOpacity(0.05),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Work Location Header
-            const Text(
-              'Work Location',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkGrey),
-            ),
-            const SizedBox(height: 12),
-
-            // State Dropdown
-            DropdownButtonFormField<String>(
-              value: _selectedState,
-              decoration: InputDecoration(
-                labelText: 'State *',
-                prefixIcon: const Icon(Icons.map_outlined),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey.withOpacity(0.05),
-              ),
-              items: _availableStates
-                  .map((state) => DropdownMenuItem<String>(
-                        value: state,
-                        child: Text(state),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedState = value;
-                  _selectedDistrict = null;
-                  _selectedDistricts.clear();
-                });
-              },
-              validator: (value) => (value == null || value.isEmpty)
-                  ? 'Please select state'
-                  : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Districts multi-select
-            _districtsMultiSelect(districts),
-
-            const SizedBox(height: 24),
-
-            // Members Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Add Members',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkGrey),
-                ),
-                // Role counters (creator included)
-                const SizedBox(height: 8),
-
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_selectedUserIds.length} selected',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.primaryBlue,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Builder(
-              builder: (_) {
-                int admins = 0,
-                    sales = 0,
-                    survey = 0,
-                    installation = 0,
-                    operations = 0,
-                    accounts = 0;
-                for (final u in _selectedUsersIncludingMe()) {
-                  final r = _normRole(u['role']);
-                  if (r == 'admin') admins++;
-                  if (r == 'sales') sales++;
-                  if (r == 'survey') survey++;
-                  if (r == 'installation') installation++;
-                  if (r == 'accounts') accounts++;
-
-                  if (r == 'operation') operations++;
-                }
-                return Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    Chip(
-                      avatar: const Icon(Icons.admin_panel_settings, size: 12),
-                      label: Text(
-                        'Admin: $admins',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Chip(
-                      avatar: const Icon(Icons.storefront, size: 12),
-                      label: Text(
-                        'Sales: $sales',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Chip(
-                      avatar: const Icon(Icons.storefront, size: 12),
-                      label: Text(
-                        'Survey: $survey',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Chip(
-                      avatar: const Icon(Icons.storefront, size: 12),
-                      label: Text(
-                        'Installation: $installation',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Chip(
-                      avatar: const Icon(Icons.storefront, size: 12),
-                      label: Text(
-                        'Operations: $operations',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Chip(
-                      avatar: const Icon(Icons.storefront, size: 12),
-                      label: Text(
-                        'Accounts: $accounts',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 6),
-
-            // Search box
-            TextField(
-              controller: _memberSearchController,
-              decoration: InputDecoration(
-                hintText: 'Search members by name or email',
-                prefixIcon: const Icon(Icons.search),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.grey.withOpacity(0.05),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-
-            // Bulk select buttons
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () {
-                    final ids = _filteredUsers
-                        .map((u) => (u['uid'] ?? '').trim())
-                        .where((id) => id.isNotEmpty)
-                        .toList();
-                    final me = ref.read(currentUserProvider).value?.uid;
-                    setState(() {
-                      for (final id in ids) {
-                        if (id == me) continue;
-                        if (!_selectedUserIds.contains(id)) {
-                          _selectedUserIds.add(id);
-                        }
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.done_all, size: 18),
-                  label: const Text('Select all'),
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    final ids = _filteredUsers
-                        .map((u) => (u['uid'] ?? '').trim())
-                        .where((id) => id.isNotEmpty)
-                        .toSet();
-                    setState(() {
-                      _selectedUserIds.removeWhere((id) => ids.contains(id));
-                    });
-                  },
-                  icon: const Icon(Icons.clear_all, size: 18),
-                  label: const Text('Clear'),
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Members List - FIXED VERSION
-            Container(
-              constraints: const BoxConstraints(maxHeight: 350),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.mediumGrey.withOpacity(0.3)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _isLoadingUsers
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 16),
-                            Text('Loading users...',
-                                style: TextStyle(color: AppTheme.mediumGrey)),
-                          ],
-                        ),
-                      ),
-                    )
-                  : _allUsers.isEmpty
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.people_outline,
-                                    size: 48, color: AppTheme.mediumGrey),
-                                SizedBox(height: 12),
-                                Text('No users found',
-                                    style:
-                                        TextStyle(color: AppTheme.mediumGrey)),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          itemCount: _filteredUsers.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            indent: 72,
-                            color: AppTheme.mediumGrey.withOpacity(0.2),
-                          ),
-                          itemBuilder: (context, index) {
-                            final raw = _filteredUsers[index];
-
-                            print(raw);
-                            final uid = (raw['uid'] ?? '').trim();
-                            final name = (raw['name'] ?? '').trim();
-                            final email = (raw['email'] ?? '').trim();
-                            final role = (raw['role'] ?? '').trim(); // ← NEW
-
-                            if (uid.isEmpty) return const SizedBox.shrink();
-
-                            final me = ref.read(currentUserProvider).value;
-                            if (me?.uid == uid) return const SizedBox.shrink();
-
-                            final isSelected = _selectedUserIds.contains(uid);
-                            final displayName = name.isNotEmpty
-                                ? name
-                                : (email.isNotEmpty ? email : 'Unknown');
-                            final subtitle =
-                                email.isNotEmpty && email != displayName
-                                    ? email
-                                    : null;
-
-                            String initial;
-                            if (name.isNotEmpty) {
-                              initial = name.characters.first.toUpperCase();
-                            } else if (email.isNotEmpty) {
-                              initial = email.characters.first.toUpperCase();
-                            } else {
-                              initial = '?';
-                            }
-
-                            return Material(
-                              color: isSelected
-                                  ? AppTheme.primaryBlue.withOpacity(0.05)
-                                  : Colors.transparent,
-                              child: InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    if (isSelected) {
-                                      _selectedUserIds.remove(uid);
-                                    } else {
-                                      _selectedUserIds.add(uid);
-                                    }
-                                  });
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      // Avatar
-                                      CircleAvatar(
-                                        radius: 22,
-                                        backgroundColor: AppTheme.primaryTeal
-                                            .withOpacity(0.1),
-                                        child: Text(
-                                          initial,
-                                          style: const TextStyle(
-                                            color: AppTheme.primaryTeal,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-
-                                      // Name & Email
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              displayName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                fontSize: 15,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            if (role.isNotEmpty)
-                                              _rolePill(role), // ← NEW
-
-                                            if (subtitle != null) ...[
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                subtitle,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppTheme.mediumGrey
-                                                      .withOpacity(0.8),
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-
-                                      // Checkbox
-                                      Checkbox(
-                                        value: isSelected,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            if (value == true) {
-                                              _selectedUserIds.add(uid);
-                                            } else {
-                                              _selectedUserIds.remove(uid);
-                                            }
-                                          });
-                                        },
-                                        activeColor: AppTheme.primaryBlue,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-            ),
-            const SizedBox(height: 20),
-
-            // Info Note
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: AppTheme.primaryBlue.withOpacity(0.2)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline,
-                      color: AppTheme.primaryBlue, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'You will be automatically added as group creator. Select other members to add.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.darkGrey.withOpacity(0.8),
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Create Button
-            Container(
-              height: 56,
-              decoration: AppTheme.gradientButtonDecoration,
-              child: ElevatedButton(
-                onPressed: (_isLoading || _uploadingIcon) ? null : _createGroup,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5),
-                      )
-                    : const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.group_add, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text(
-                            'Create Group',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            const SizedBox(height: 16),
+            // Bottom Navigation
+            _buildBottomNavigation(),
           ],
         ),
       ),
     );
   }
 
-  Widget _districtsMultiSelect(List<String> districts) {
-    if (_selectedState == null) return const SizedBox.shrink();
+  Widget _buildProgressIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _buildStepIndicator(0, 'Basic', Icons.info_outline),
+          _buildStepConnector(0),
+          _buildStepIndicator(1, 'Location', Icons.location_on_outlined),
+          _buildStepConnector(1),
+          _buildStepIndicator(2, 'Members', Icons.group_outlined),
+        ],
+      ),
+    );
+  }
 
-    final allSelected =
-        _selectedDistricts.length == districts.length && districts.isNotEmpty;
+  Widget _buildStepIndicator(int step, String label, IconData icon) {
+    final isActive = _currentStep == step;
+    final isCompleted = _currentStep > step;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isCompleted
+                  ? AppTheme.successGreen
+                  : isActive
+                      ? AppTheme.primaryBlue
+                      : Colors.grey.withOpacity(0.2),
+            ),
+            child: Icon(
+              isCompleted ? Icons.check : icon,
+              color:
+                  isActive || isCompleted ? Colors.white : AppTheme.mediumGrey,
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              color: isActive ? AppTheme.primaryBlue : AppTheme.mediumGrey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepConnector(int beforeStep) {
+    final isCompleted = _currentStep > beforeStep;
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 24),
+        color:
+            isCompleted ? AppTheme.successGreen : Colors.grey.withOpacity(0.3),
+      ),
+    );
+  }
+
+  Widget _buildStep1BasicInfo() {
+    return ListView(
+      padding: const EdgeInsets.all(24),
       children: [
         const Text(
-          'Districts *',
+          'Basic Information',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
             color: AppTheme.darkGrey,
           ),
         ),
         const SizedBox(height: 8),
-
-        // Control buttons
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () {
-                setState(() => _selectedDistricts = districts.toSet());
-              },
-              icon: const Icon(Icons.done_all, size: 16),
-              label: const Text('Select all', style: TextStyle(fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: () {
-                setState(() => _selectedDistricts.clear());
-              },
-              icon: const Icon(Icons.clear_all, size: 16),
-              label: const Text('Clear all', style: TextStyle(fontSize: 13)),
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-            if (districts.isNotEmpty)
-              Chip(
-                label: Text(
-                  '${_selectedDistricts.length}/${districts.length}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                avatar: Icon(
-                  allSelected ? Icons.check_circle : Icons.check_circle_outline,
-                  color: allSelected ? Colors.green : AppTheme.mediumGrey,
-                  size: 18,
-                ),
-                visualDensity: VisualDensity.compact,
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Districts chips
-        Container(
-          constraints: const BoxConstraints(maxHeight: 200),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppTheme.mediumGrey.withOpacity(0.3)),
-            borderRadius: BorderRadius.circular(12),
-            color: Colors.grey.withOpacity(0.02),
+        Text(
+          'Set up your group with a name and optional icon',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppTheme.mediumGrey.withOpacity(0.8),
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: districts.map<Widget>((String d) {
-                final selected = _selectedDistricts.contains(d);
-                return FilterChip(
-                  label: Text(d),
-                  selected: selected,
-                  onSelected: (v) {
-                    setState(() {
-                      if (v) {
-                        _selectedDistricts.add(d);
-                      } else {
-                        _selectedDistricts.remove(d);
-                      }
-                    });
-                  },
-                  selectedColor: AppTheme.primaryBlue.withOpacity(0.2),
-                  checkmarkColor: AppTheme.primaryBlue,
-                  backgroundColor: Colors.grey.withOpacity(0.1),
-                  labelStyle: TextStyle(
-                    fontSize: 13,
-                    color: selected ? AppTheme.primaryBlue : AppTheme.darkGrey,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+        const SizedBox(height: 32),
+
+        // Group Icon
+        Center(
+          child: Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryBlue.withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
+                  backgroundImage:
+                      _iconBytes != null ? MemoryImage(_iconBytes!) : null,
+                  child: (_iconBytes == null &&
+                          _iconFile == null &&
+                          _uploadedIconUrl == null)
+                      ? const Icon(Icons.group,
+                          size: 60, color: AppTheme.primaryBlue)
+                      : (_uploadedIconUrl != null
+                          ? ClipOval(
+                              child: Image.network(
+                                _uploadedIconUrl!,
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.broken_image),
+                              ),
+                            )
+                          : null),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _uploadingIcon ? null : _pickGroupIcon,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient:
+                            _uploadingIcon ? null : AppTheme.primaryGradient,
+                        color: _uploadingIcon ? Colors.grey : null,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: _uploadingIcon
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.camera_alt,
+                              size: 20, color: Colors.white),
+                    ),
                   ),
-                  visualDensity: VisualDensity.compact,
-                );
-              }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 40),
+
+        // Group Name
+        TextFormField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            labelText: 'Group Name *',
+            hintText: 'e.g., Dehradun Solar Team',
+            prefixIcon:
+                const Icon(Icons.group_outlined, color: AppTheme.primaryBlue),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppTheme.primaryBlue, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey.withOpacity(0.05),
+          ),
+          validator: (value) => (value == null || value.isEmpty)
+              ? 'Please enter group name'
+              : null,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 20),
+
+        // Description
+        TextFormField(
+          controller: _descriptionController,
+          maxLines: 4,
+          decoration: InputDecoration(
+            labelText: 'Description (Optional)',
+            hintText: 'What is this group about?',
+            prefixIcon: const Padding(
+              padding: EdgeInsets.only(bottom: 60),
+              child:
+                  Icon(Icons.description_outlined, color: AppTheme.primaryBlue),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppTheme.primaryBlue, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey.withOpacity(0.05),
           ),
         ),
       ],
     );
   }
 
+  Widget _buildStep2Location() {
+    final List<String> districts = _selectedState == null
+        ? const <String>[]
+        : (_stateDistricts[_selectedState] ?? const <String>[]);
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Text(
+          'Work Location',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkGrey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Select the state and districts for this group',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppTheme.mediumGrey.withOpacity(0.8),
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // State Dropdown
+        DropdownButtonFormField<String>(
+          value: _selectedState,
+          decoration: InputDecoration(
+            labelText: 'State *',
+            prefixIcon:
+                const Icon(Icons.map_outlined, color: AppTheme.primaryBlue),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppTheme.primaryBlue, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.grey.withOpacity(0.05),
+          ),
+          items: _availableStates
+              .map((state) => DropdownMenuItem<String>(
+                    value: state,
+                    child: Text(state),
+                  ))
+              .toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedState = value;
+              _selectedDistrict = null;
+              _selectedDistricts.clear();
+            });
+          },
+          validator: (value) =>
+              (value == null || value.isEmpty) ? 'Please select state' : null,
+        ),
+        const SizedBox(height: 24),
+
+        // Districts Section
+        if (_selectedState != null) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Districts *',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.darkGrey,
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _selectedDistricts.isEmpty
+                      ? AppTheme.errorRed.withOpacity(0.1)
+                      : AppTheme.successGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _selectedDistricts.isEmpty
+                        ? AppTheme.errorRed.withOpacity(0.3)
+                        : AppTheme.successGreen.withOpacity(0.3),
+                  ),
+                ),
+                child: Text(
+                  '${_selectedDistricts.length}/${districts.length} selected',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _selectedDistricts.isEmpty
+                        ? AppTheme.errorRed
+                        : AppTheme.successGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Quick Actions
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _selectedDistricts = districts.toSet());
+                  },
+                  icon: const Icon(Icons.done_all, size: 18),
+                  label: const Text('Select All'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryBlue,
+                    side: const BorderSide(color: AppTheme.primaryBlue),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _selectedDistricts.clear());
+                  },
+                  icon: const Icon(Icons.clear_all, size: 18),
+                  label: const Text('Clear All'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.mediumGrey,
+                    side:
+                        BorderSide(color: AppTheme.mediumGrey.withOpacity(0.5)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Districts Grid
+          Container(
+            constraints: const BoxConstraints(maxHeight: 400),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.mediumGrey.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: districts.map<Widget>((String d) {
+                  final selected = _selectedDistricts.contains(d);
+                  return FilterChip(
+                    label: Text(d),
+                    selected: selected,
+                    onSelected: (v) {
+                      setState(() {
+                        if (v) {
+                          _selectedDistricts.add(d);
+                        } else {
+                          _selectedDistricts.remove(d);
+                        }
+                      });
+                    },
+                    selectedColor: AppTheme.primaryBlue.withOpacity(0.15),
+                    checkmarkColor: AppTheme.primaryBlue,
+                    backgroundColor: Colors.grey.withOpacity(0.08),
+                    labelStyle: TextStyle(
+                      fontSize: 13,
+                      color:
+                          selected ? AppTheme.primaryBlue : AppTheme.darkGrey,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: selected
+                            ? AppTheme.primaryBlue
+                            : Colors.transparent,
+                        width: selected ? 1.5 : 0,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStep3Members() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add Members',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkGrey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Select team members for this group',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.mediumGrey.withOpacity(0.8),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Role Requirements Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.primaryBlue.withOpacity(0.1),
+                      AppTheme.primaryTeal.withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _hasRequiredRoles()
+                        ? AppTheme.successGreen.withOpacity(0.3)
+                        : AppTheme.primaryBlue.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _hasRequiredRoles()
+                              ? Icons.check_circle
+                              : Icons.shield_outlined,
+                          color: _hasRequiredRoles()
+                              ? AppTheme.successGreen
+                              : AppTheme.primaryBlue,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _hasRequiredRoles()
+                                ? 'Role Requirements Met ✓'
+                                : 'Required: 1 Admin + 1 Sales',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _hasRequiredRoles()
+                                  ? AppTheme.successGreen
+                                  : AppTheme.primaryBlue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRoleSummaryChips(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Search Bar
+              TextField(
+                controller: _memberSearchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name, email, or role',
+                  prefixIcon:
+                      const Icon(Icons.search, color: AppTheme.primaryBlue),
+                  suffixIcon: _memberSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            _memberSearchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        BorderSide(color: AppTheme.mediumGrey.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: AppTheme.primaryBlue, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.withOpacity(0.05),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 16),
+
+              // Bulk Actions & Count
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final ids = _filteredUsers
+                            .map((u) => (u['uid'] ?? '').trim())
+                            .where((id) => id.isNotEmpty)
+                            .toList();
+                        final me = ref.read(currentUserProvider).value?.uid;
+                        setState(() {
+                          for (final id in ids) {
+                            if (id == me) continue;
+                            if (!_selectedUserIds.contains(id)) {
+                              _selectedUserIds.add(id);
+                            }
+                          }
+                        });
+                      },
+                      icon: const Icon(Icons.done_all, size: 20),
+                      label: const Text('Select All',
+                          style: TextStyle(
+                              color: AppTheme.primaryBlue, fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryBlue,
+                        side: const BorderSide(color: AppTheme.primaryBlue),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final ids = _filteredUsers
+                            .map((u) => (u['uid'] ?? '').trim())
+                            .where((id) => id.isNotEmpty)
+                            .toSet();
+                        setState(() {
+                          _selectedUserIds
+                              .removeWhere((id) => ids.contains(id));
+                        });
+                      },
+                      icon: const Icon(Icons.clear_all, size: 20),
+                      label: const Text('Clear',
+                          style: TextStyle(
+                              color: AppTheme.mediumGrey, fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.mediumGrey,
+                        side: BorderSide(
+                            color: AppTheme.mediumGrey.withOpacity(0.5)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _selectedUserIds.isEmpty
+                          ? AppTheme.mediumGrey.withOpacity(0.1)
+                          : AppTheme.primaryBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _selectedUserIds.isEmpty
+                            ? AppTheme.mediumGrey.withOpacity(0.3)
+                            : AppTheme.primaryBlue.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Text(
+                      '${_selectedUserIds.length}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _selectedUserIds.isEmpty
+                            ? AppTheme.mediumGrey
+                            : AppTheme.primaryBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Members List
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.mediumGrey.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: _isLoadingUsers
+                ? const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Loading users...',
+                            style: TextStyle(color: AppTheme.mediumGrey)),
+                      ],
+                    ),
+                  )
+                : _allUsers.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.people_outline,
+                                size: 48, color: AppTheme.mediumGrey),
+                            SizedBox(height: 12),
+                            Text('No users found',
+                                style: TextStyle(color: AppTheme.mediumGrey)),
+                          ],
+                        ),
+                      )
+                    : _filteredUsers.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.search_off,
+                                    size: 48, color: AppTheme.mediumGrey),
+                                const SizedBox(height: 12),
+                                const Text('No matching users',
+                                    style:
+                                        TextStyle(color: AppTheme.mediumGrey)),
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () {
+                                    _memberSearchController.clear();
+                                    setState(() {});
+                                  },
+                                  child: const Text('Clear search'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: _filteredUsers.length,
+                            separatorBuilder: (_, __) => Divider(
+                              height: 1,
+                              indent: 72,
+                              color: AppTheme.mediumGrey.withOpacity(0.2),
+                            ),
+                            itemBuilder: (context, index) {
+                              final raw = _filteredUsers[index];
+                              final uid = (raw['uid'] ?? '').trim();
+                              final name = (raw['name'] ?? '').trim();
+                              final email = (raw['email'] ?? '').trim();
+                              final role = (raw['role'] ?? '').trim();
+
+                              if (uid.isEmpty) return const SizedBox.shrink();
+
+                              final me = ref.read(currentUserProvider).value;
+                              if (me?.uid == uid)
+                                return const SizedBox.shrink();
+
+                              final isSelected = _selectedUserIds.contains(uid);
+                              final displayName = name.isNotEmpty
+                                  ? name
+                                  : (email.isNotEmpty ? email : 'Unknown');
+                              final subtitle =
+                                  email.isNotEmpty && email != displayName
+                                      ? email
+                                      : null;
+
+                              String initial;
+                              if (name.isNotEmpty) {
+                                initial = name.characters.first.toUpperCase();
+                              } else if (email.isNotEmpty) {
+                                initial = email.characters.first.toUpperCase();
+                              } else {
+                                initial = '?';
+                              }
+
+                              return Material(
+                                color: isSelected
+                                    ? AppTheme.primaryBlue.withOpacity(0.08)
+                                    : Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isSelected) {
+                                        _selectedUserIds.remove(uid);
+                                      } else {
+                                        _selectedUserIds.add(uid);
+                                      }
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    child: Row(
+                                      children: [
+                                        // Avatar
+                                        Container(
+                                          width: 48,
+                                          height: 48,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                AppTheme.primaryTeal
+                                                    .withOpacity(0.8),
+                                                AppTheme.primaryBlue
+                                                    .withOpacity(0.8),
+                                              ],
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              initial,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+
+                                        // Name & Email
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                displayName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 15,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (role.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                _rolePill(role),
+                                              ],
+                                              if (subtitle != null) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  subtitle,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: AppTheme.mediumGrey
+                                                        .withOpacity(0.8),
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+
+                                        // Checkbox
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: isSelected
+                                                ? AppTheme.primaryBlue
+                                                : Colors.transparent,
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? AppTheme.primaryBlue
+                                                  : AppTheme.mediumGrey,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: isSelected
+                                              ? const Icon(Icons.check,
+                                                  size: 16, color: Colors.white)
+                                              : null,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildRoleSummaryChips() {
+    int admins = 0,
+        sales = 0,
+        survey = 0,
+        installation = 0,
+        operations = 0,
+        accounts = 0;
+    for (final u in _selectedUsersIncludingMe()) {
+      final r = _normRole(u['role']);
+      if (r == 'admin') admins++;
+      if (r == 'sales') sales++;
+      if (r == 'survey') survey++;
+      if (r == 'installation') installation++;
+      if (r == 'accounts') accounts++;
+      if (r == 'operation') operations++;
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _buildRoleChip(
+            'Admin', admins, Icons.admin_panel_settings, admins >= 1),
+        _buildRoleChip('Sales', sales, Icons.storefront, sales >= 1),
+        if (survey > 0)
+          _buildRoleChip('Survey', survey, Icons.assignment, false),
+        if (installation > 0)
+          _buildRoleChip('Install', installation, Icons.construction, false),
+        if (operations > 0)
+          _buildRoleChip('Operations', operations, Icons.settings, false),
+        if (accounts > 0)
+          _buildRoleChip('Accounts', accounts, Icons.account_balance, false),
+      ],
+    );
+  }
+
+  Widget _buildRoleChip(
+      String label, int count, IconData icon, bool isRequired) {
+    final hasMembers = count > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: hasMembers
+            ? (isRequired
+                ? AppTheme.successGreen.withOpacity(0.15)
+                : AppTheme.primaryBlue.withOpacity(0.15))
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasMembers
+              ? (isRequired ? AppTheme.successGreen : AppTheme.primaryBlue)
+              : AppTheme.mediumGrey.withOpacity(0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: hasMembers
+                ? (isRequired ? AppTheme.successGreen : AppTheme.primaryBlue)
+                : AppTheme.mediumGrey,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$label: $count',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: hasMembers
+                  ? (isRequired ? AppTheme.successGreen : AppTheme.primaryBlue)
+                  : AppTheme.mediumGrey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            if (_currentStep > 0)
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          setState(() => _currentStep--);
+                        },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    side: const BorderSide(color: AppTheme.primaryBlue),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.arrow_back),
+                      SizedBox(width: 8),
+                      Text('Back',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            if (_currentStep > 0) const SizedBox(width: 16),
+            Expanded(
+              flex: 2,
+              child: Container(
+                decoration: _currentStep == 2
+                    ? AppTheme.gradientButtonDecoration
+                    : null,
+                child: ElevatedButton(
+                  onPressed: (_isLoading ||
+                          _uploadingIcon ||
+                          !_canProceedToStep(_currentStep + 1))
+                      ? null
+                      : () {
+                          if (_currentStep < 2) {
+                            setState(() => _currentStep++);
+                          } else {
+                            _createGroup();
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _currentStep == 2
+                        ? Colors.transparent
+                        : AppTheme.primaryBlue,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    disabledBackgroundColor:
+                        AppTheme.mediumGrey.withOpacity(0.3),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _currentStep == 2 ? 'Create Group' : 'Continue',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _currentStep == 2
+                                  ? Icons.check
+                                  : Icons.arrow_forward,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _rolePill(String role) {
     if (role.isEmpty) return const SizedBox.shrink();
+
+    Color getRoleColor(String r) {
+      final normalized = _normRole(r);
+      switch (normalized) {
+        case 'admin':
+          return Colors.red;
+        case 'sales':
+          return Colors.blue;
+        case 'survey':
+          return Colors.orange;
+        case 'installation':
+          return Colors.green;
+        case 'operation':
+          return Colors.purple;
+        case 'accounts':
+          return Colors.teal;
+        default:
+          return Colors.grey;
+      }
+    }
+
+    final color = getRoleColor(role);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.blueAccent.withOpacity(0.30),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.blueGrey.withOpacity(0.25)),
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
-        role,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        role.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+          letterSpacing: 0.5,
+        ),
         overflow: TextOverflow.ellipsis,
       ),
     );

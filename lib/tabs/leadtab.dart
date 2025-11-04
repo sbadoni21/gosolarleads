@@ -120,14 +120,14 @@ class _LeadTabState extends ConsumerState<LeadTab> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(32),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: AppTheme.lightGrey,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.people_outline,
-                              size: 80,
+                              size: 20,
                               color: AppTheme.mediumGrey,
                             ),
                           ),
@@ -135,17 +135,9 @@ class _LeadTabState extends ConsumerState<LeadTab> {
                           const Text(
                             'No Leads Found',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.darkGrey,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Tap the + button to add your first lead',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.mediumGrey,
                             ),
                           ),
                         ],
@@ -307,131 +299,165 @@ class _LeadTabState extends ConsumerState<LeadTab> {
     );
   }
 
-  // Statistics Section Widget
-  Widget _buildStatisticsSection(AsyncValue<Map<String, int>> statsAsync) {
+// Enhanced Statistics Section Widget with better UX
+  Widget _buildStatisticsSection(AsyncValue<Map<String, dynamic>> statsAsync) {
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryBlue,
-            AppTheme.primaryBlue.withOpacity(0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryBlue.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
       child: statsAsync.when(
-        data: (stats) {
-          final total = stats['total'] ?? 0;
-          final submitted = stats['submitted'] ?? 0;
-          final pending = stats['pending'] ?? 0;
-          final completed = stats['completed'] ?? 0;
-          final rejected = stats['rejected'] ?? 0;
+        data: (stats) => _buildStatsContent(stats),
+        loading: () => _buildLoadingState(),
+        error: (error, stack) => _buildErrorState(),
+      ),
+    );
+  }
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStatsContent(Map<String, dynamic> stats) {
+    final total = stats['total'] ?? 0;
+    final submitted = stats['submitted'] ?? 0;
+    final pending = stats['pending'] ?? 0;
+    final completed = stats['completed'] ?? 0;
+    final rejected = stats['rejected'] ?? 0;
+    final assigned = stats['assigned'] ?? 0;
+    final unassigned = stats['unassigned'] ?? 0;
+
+    return Column(
+      children: [
+        // Main Stats Card
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.primaryBlue,
+                AppTheme.primaryBlue.withOpacity(0.85),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryBlue.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
             children: [
-              // Header
+              // Header with Total Count
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
-                      Icons.bar_chart_rounded,
+                      Icons.analytics_rounded,
                       color: Colors.white,
-                      size: 24,
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
+                  const SizedBox(width: 16),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Lead Statistics',
+                        const Text(
+                          'Lead Overview',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
-                          'Overview of all leads',
+                          'Total Performance Metrics',
                           style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 13,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.people,
-                          size: 16,
-                          color: AppTheme.primaryBlue,
+                  // Animated Total Count Badge
+                  TweenAnimationBuilder<int>(
+                    tween: IntTween(begin: 0, end: total),
+                    duration: const Duration(milliseconds: 1500),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$total',
-                          style: const TextStyle(
-                            color: AppTheme.primaryBlue,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.people_rounded,
+                              size: 20,
+                              color: AppTheme.primaryBlue,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$value',
+                              style: const TextStyle(
+                                color: AppTheme.primaryBlue,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // Stats Grid
+              // Assignment Overview Bar
+              _buildAssignmentBar(assigned, unassigned, total),
+              const SizedBox(height: 24),
+
+              // Status Grid
               Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(
-                      icon: Icons.send,
+                    child: _buildAnimatedStatCard(
+                      icon: Icons.send_rounded,
                       label: 'Submitted',
                       count: submitted,
+                      total: total,
                       color: AppTheme.primaryBlue,
-                      percentage: total > 0 ? (submitted / total * 100) : 0,
+                      delay: 0,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(
-                      icon: Icons.pending_actions,
+                    child: _buildAnimatedStatCard(
+                      icon: Icons.pending_actions_rounded,
                       label: 'Pending',
                       count: pending,
+                      total: total,
                       color: AppTheme.warningAmber,
-                      percentage: total > 0 ? (pending / total * 100) : 0,
+                      delay: 100,
                     ),
                   ),
                 ],
@@ -440,82 +466,254 @@ class _LeadTabState extends ConsumerState<LeadTab> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(
-                      icon: Icons.check_circle,
+                    child: _buildAnimatedStatCard(
+                      icon: Icons.check_circle_rounded,
                       label: 'Completed',
                       count: completed,
+                      total: total,
                       color: AppTheme.successGreen,
-                      percentage: total > 0 ? (completed / total * 100) : 0,
+                      delay: 200,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(
-                      icon: Icons.cancel,
+                    child: _buildAnimatedStatCard(
+                      icon: Icons.cancel_rounded,
                       label: 'Rejected',
                       count: rejected,
+                      total: total,
                       color: AppTheme.errorRed,
-                      percentage: total > 0 ? (rejected / total * 100) : 0,
+                      delay: 300,
                     ),
                   ),
                 ],
               ),
             ],
-          );
-        },
-        loading: () => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: CircularProgressIndicator(color: Colors.white),
           ),
         ),
-        error: (error, stack) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Icon(Icons.error_outline,
-                    color: Colors.white70, size: 32),
-                const SizedBox(height: 8),
-                const Text(
-                  'Failed to load statistics',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => ref.invalidate(leadStatisticsProvider),
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+
+        // Additional Insights Section
+        if (stats['registrationCompleted'] != null ||
+            stats['installationCompleted'] != null)
+          const SizedBox(height: 16),
+
+        if (stats['registrationCompleted'] != null ||
+            stats['installationCompleted'] != null)
+          _buildInsightsSection(stats),
+      ],
     );
   }
 
-  // Stat Card Widget
-  Widget _buildStatCard({
+// Assignment Progress Bar
+  Widget _buildAssignmentBar(int assigned, int unassigned, int total) {
+    final assignedPercent = total > 0 ? (assigned / total) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Assignment Status',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              '${(assignedPercent * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: assignedPercent),
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildMiniStat('Assigned', assigned, Colors.white),
+            _buildMiniStat('Unassigned', unassigned, Colors.white70),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStat(String label, int count, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$label: $count',
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+// Animated Stat Card with delayed entrance
+  Widget _buildAnimatedStatCard({
     required IconData icon,
     required String label,
     required int count,
+    required int total,
     required Color color,
-    required double percentage,
+    required int delay,
   }) {
+    final percentage = total > 0 ? (count / total * 100) : 0.0;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: value,
+          child: Opacity(
+            opacity: value,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, color: color, size: 20),
+                      ),
+                      const Spacer(),
+                      TweenAnimationBuilder<int>(
+                        tween: IntTween(begin: 0, end: count),
+                        duration: Duration(milliseconds: 1000 + delay),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, child) {
+                          return Text(
+                            '$value',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Progress indicator
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: percentage / 100),
+                      duration: Duration(milliseconds: 1200 + delay),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return LinearProgressIndicator(
+                          value: value,
+                          minHeight: 4,
+                          backgroundColor: color.withOpacity(0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: percentage),
+                    duration: Duration(milliseconds: 1200 + delay),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return Text(
+                        '${value.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+// Additional Insights Section
+  Widget _buildInsightsSection(Map<String, dynamic> stats) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -524,51 +722,218 @@ class _LeadTabState extends ConsumerState<LeadTab> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const Spacer(),
-              Text(
-                '${percentage.toStringAsFixed(0)}%',
+              Icon(Icons.insights_rounded,
+                  color: AppTheme.primaryBlue, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Quick Insights',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: Colors.black87,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              if (stats['registrationCompleted'] != null)
+                _buildInsightChip(
+                  icon: Icons.assignment_turned_in_rounded,
+                  label: 'Registration',
+                  value: '${stats['registrationCompleted']}',
+                  color: Colors.blue,
+                ),
+              if (stats['installationCompleted'] != null)
+                _buildInsightChip(
+                  icon: Icons.build_circle_rounded,
+                  label: 'Installation',
+                  value: '${stats['installationCompleted']}',
+                  color: Colors.orange,
+                ),
+              if (stats['hasJansamarth'] != null && stats['hasJansamarth'] > 0)
+                _buildInsightChip(
+                  icon: Icons.description_rounded,
+                  label: 'Jansamarth',
+                  value: '${stats['hasJansamarth']}',
+                  color: Colors.purple,
+                ),
+              if (stats['accountsFirstPaymentCompleted'] != null)
+                _buildInsightChip(
+                  icon: Icons.payment_rounded,
+                  label: 'First Payment',
+                  value: '${stats['accountsFirstPaymentCompleted']}',
+                  color: Colors.green,
+                ),
+            ],
           ),
-          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsightChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
+              color: color,
               fontSize: 12,
-              color: AppTheme.mediumGrey,
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Loading State with shimmer effect
+  Widget _buildLoadingState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primaryBlue.withOpacity(0.8),
+            AppTheme.primaryBlue.withOpacity(0.6),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 20,
+                      width: 150,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 14,
+                      width: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 3,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading statistics...',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Error State with retry button
+  Widget _buildErrorState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            color: Colors.red.shade400,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Failed to Load Statistics',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: percentage / 100,
-              backgroundColor: color.withOpacity(0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 4,
+          Text(
+            'Please check your connection and try again',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => ref.invalidate(leadStatisticsProvider),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -779,27 +1144,6 @@ class _LeadTabState extends ConsumerState<LeadTab> {
     LeadPool lead,
   ) {
     // Your existing implementation - copy from above
-  }
-
-  Future<void> _endCallAndUpload(
-    BuildContext context,
-    LocalCallRecordingService recordingService,
-  ) async {
-    // Your existing implementation - copy from above
-  }
-
-  Widget _buildConsentItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle,
-              size: 16, color: AppTheme.successGreen),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 12))),
-        ],
-      ),
-    );
   }
 
   Widget _buildActionButton({

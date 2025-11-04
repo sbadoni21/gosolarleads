@@ -487,37 +487,16 @@ class ChatTab extends ConsumerWidget {
         ),
       ),
       floatingActionButton: (user?.isSuperAdmin == true)
-          ? Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryBlue.withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const CreateGroupScreen()),
-                  );
-                },
-                backgroundColor: AppTheme.primaryBlue,
-                elevation: 0,
-                icon: const Icon(Icons.add, color: Colors.white, size: 24),
-                label: const Text(
-                  'New Group',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+                );
+              },
+              backgroundColor: AppTheme.primaryBlue,
+              elevation: 0,
+              child: const Icon(Icons.add),
             )
           : null,
     );

@@ -199,20 +199,27 @@ class ChatService {
     }
   }
 
-  Future<void> updateUserPresence({
-    required String userId,
-    String? activeGroupId,
-  }) async {
-    try {
-      await _firestore.collection('userPresence').doc(userId).set({
-        'activeGroupId': activeGroupId,
-        'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      print('❌ Error updating presence: $e');
-    }
-  }
+// lib/services/chat_service.dart
 
+Future<void> updateUserPresence({
+  required String userId,
+  String? activeGroupId,
+}) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('user_presence')
+        .doc(userId)
+        .set({
+      'activeGroupId': activeGroupId,
+      'lastSeen': FieldValue.serverTimestamp(),
+      'isOnline': activeGroupId != null,
+    }, SetOptions(merge: true));
+    
+    print('✅ Presence updated: activeGroupId=$activeGroupId');
+  } catch (e) {
+    print('❌ Failed to update presence: $e');
+  }
+}
   // Send a PDF message
   Future<void> sendPdfMessage({
     required String groupId,

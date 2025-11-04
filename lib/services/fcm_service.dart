@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -16,12 +17,67 @@ class FCMService {
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+  Future<void> initializeForUser(String userId) async {
+    try {
+      // Make sure FCM is initialized
+      if (_fcmToken == null) {
+        _fcmToken = await _firebaseMessaging.getToken();
+        print('📱 Got FCM Token: $_fcmToken');
+      }
 
+      if (_fcmToken == null) {
+        print('❌ No FCM token available');
+        return;
+      }
+
+      // Save token to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('deviceTokens')
+          .doc(_fcmToken)
+          .set({
+        'platform': Platform.isAndroid ? 'android' : 'ios',
+        'active': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastUsed': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('✅ Token saved for user: $userId');
+
+      // Listen for token refresh
+      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+        _fcmToken = newToken;
+        print('🔄 Token refreshed: $newToken');
+        
+        // Save new token
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('deviceTokens')
+            .doc(newToken)
+            .set({
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+          'active': true,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastUsed': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      });
+
+      // Also call the existing registerDeviceToken if you have it
+      await registerDeviceToken(userId: userId);
+
+    } catch (e) {
+      print('❌ Error initializing FCM for user: $e');
+    }
+  }
 
   void setActiveChat(String? groupId) {
     _activeGroupId = groupId;
     print('📍 Active chat set to: $groupId');
   }
+
+
   // Initialize FCM
   Future<void> initialize() async {
     // Request permission (iOS)

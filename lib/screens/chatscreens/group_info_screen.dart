@@ -19,8 +19,6 @@ class GroupInfoScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allLeadsAsync = ref.watch(allLeadsProvider);
     final currentUser = ref.watch(currentUserProvider).value;
-
-    // Watch the specific group for real-time updates
     final groupAsync = ref.watch(specificGroupProvider(group.id));
 
     return Scaffold(
@@ -28,6 +26,13 @@ class GroupInfoScreen extends ConsumerWidget {
         title: const Text('Group Analytics'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (currentUser!.role == "superadmin" || currentUser.role == "admin")
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () => _confirmDeleteGroup(context, group.id),
+            ),
+        ],
       ),
       body: groupAsync.when(
         data: (currentGroup) {
@@ -338,12 +343,15 @@ class GroupInfoScreen extends ConsumerWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 8,
-              color: color,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+              softWrap: true,
             ),
           ),
         ],
@@ -1213,5 +1221,57 @@ class GroupInfoScreen extends ConsumerWidget {
         chatService: ref.read(chatServiceProvider),
       ),
     );
+  }
+}
+
+void _confirmDeleteGroup(BuildContext context, String groupId) {
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text("Delete Group?"),
+        content: const Text(
+          "Are you sure you want to delete this group? "
+          "This action cannot be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deleteGroup(context, groupId);
+            },
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> _deleteGroup(BuildContext context, String groupId) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection("chatGroups")
+        .doc(groupId)
+        .delete();
+
+    if (context.mounted) {
+      Navigator.pop(context); // pop GroupInfo screen
+      Navigator.pop(context); // pop GroupInfo screen
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Group deleted successfully")),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error deleting group: $e")),
+      );
+    }
   }
 }

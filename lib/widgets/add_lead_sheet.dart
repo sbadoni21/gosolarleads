@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -739,7 +738,7 @@ class _AddLeadSheetState extends ConsumerState<AddLeadSheet> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Registration SLA (30 days) will start automatically when assigned',
+                                    'Registration SLA (3 days) will start automatically when assigned',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: AppTheme.darkGrey.withOpacity(0.8),
