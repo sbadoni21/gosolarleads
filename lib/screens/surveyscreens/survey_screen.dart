@@ -553,10 +553,8 @@ class _SurveysListScreenState extends ConsumerState<SurveysListScreen>
 
   Widget _buildLeadMeta(String leadId, Survey survey) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('leadPool')
-          .doc(leadId)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance.collection('lead').doc(leadId).snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -661,10 +659,8 @@ class _SurveysListScreenState extends ConsumerState<SurveysListScreen>
 
   Widget _buildCallButton(String leadId, String leadName) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('leadPool')
-          .doc(leadId)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance.collection('lead').doc(leadId).snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const SizedBox(

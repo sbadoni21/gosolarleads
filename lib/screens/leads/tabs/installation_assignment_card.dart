@@ -778,10 +778,7 @@ Future<void> _assignInstaller(
   WidgetRef ref,
 ) async {
   try {
-    await FirebaseFirestore.instance
-        .collection('leadPool')
-        .doc(lead.uid)
-        .update({
+    await FirebaseFirestore.instance.collection('lead').doc(lead.uid).update({
       'installationAssignedTo': uid,
       'installationAssignedToName': display,
       'installationAssignedAt': FieldValue.serverTimestamp(),
@@ -845,10 +842,7 @@ Future<void> _unassignInstaller(
   if (confirm != true) return;
 
   try {
-    await FirebaseFirestore.instance
-        .collection('leadPool')
-        .doc(lead.uid)
-        .update({
+    await FirebaseFirestore.instance.collection('lead').doc(lead.uid).update({
       'installationAssignedTo': null,
       'installationAssignedToName': null,
       'installationAssignedAt': null,
@@ -904,30 +898,9 @@ void _showSnackbar(
   );
 }
 
-  Widget buildInstallationInfoCard(LeadPool lead,   BuildContext context) {
-    final installation = lead.installation;
-    if (installation == null) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionTitle('Installation Details', Icons.handyman_outlined),
-              const SizedBox(height: 12),
-              _warningBox(
-                  'No installation record yet. Assign an installer to start.')
-            ],
-          ),
-        ),
-      );
-    }
-
-    final status = (installation.status.isEmpty ? 'draft' : installation.status)
-        .toUpperCase();
-
+Widget buildInstallationInfoCard(LeadPool lead, BuildContext context) {
+  final installation = lead.installation;
+  if (installation == null) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -936,284 +909,300 @@ void _showSnackbar(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryBlue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.handyman_outlined,
-                      color: AppTheme.primaryBlue, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Installation Details',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: installation.isSubmitted
-                        ? AppTheme.successGreen.withOpacity(0.1)
-                        : AppTheme.warningAmber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: installation.isSubmitted
-                          ? AppTheme.successGreen.withOpacity(0.3)
-                          : AppTheme.warningAmber.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: installation.isSubmitted
-                          ? AppTheme.successGreen
-                          : AppTheme.warningAmber,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            // Meta KV
-            _kv('Client Name', installation.clientName),
-            _kv('Contact', installation.contact),
-            _kv('Location', installation.location),
-            _kv('Installer', installation.installerName),
-            _kv('Assigned To (uid/email)', installation.assignTo ?? '-'),
-
-            const SizedBox(height: 16),
-            const Divider(),
+            _sectionTitle('Installation Details', Icons.handyman_outlined),
             const SizedBox(height: 12),
-
-            // Images grid
-            const Text(
-              'Installation Photos',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            _installationImagesGrid(installation, context),
+            _warningBox(
+                'No installation record yet. Assign an installer to start.')
           ],
         ),
       ),
     );
   }
 
-  Widget _installationImagesGrid(Installation i, BuildContext context) {
-    // label + value pairs
-    final items = <MapEntry<String, String?>>[
-      const MapEntry('Structure', null),
-      MapEntry('Structure', i.structureImage),
-      MapEntry('Wiring (AC)', i.wiringACImage),
-      MapEntry('Wiring (DC)', i.wiringDCImage),
-      MapEntry('Inverter', i.inverterImage),
-      MapEntry('Battery', i.batteryImage),
-      MapEntry('ACDB', i.acdbImage),
-      MapEntry('DCDB', i.dcdbImage),
-      MapEntry('Earthing', i.earthingImage),
-      MapEntry('Panels', i.panelsImage),
-      MapEntry('Civil', i.civilImage),
-      MapEntry('Civil Leg', i.civilLegImage),
-      MapEntry('Civil Earthing', i.civilEarthingImage),
-      MapEntry('Inverter ON', i.inverterOnImage),
-      MapEntry('App Install', i.appInstallImage),
-      MapEntry('Plant Inspection', i.plantInspectionImage),
-      MapEntry('Damp Proof/Sprinkler', i.dampProofSprinklerImage),
-    ]
-        .where((e) => e.value != null && (e.value ?? '').trim().isNotEmpty)
-        .toList();
+  final status = (installation.status.isEmpty ? 'draft' : installation.status)
+      .toUpperCase();
 
-    if (items.isEmpty) {
-      return _warningBox('No photos uploaded yet.');
-    }
-
-    // responsive wrap of thumbnails
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: items.map((e) => _imageThumb(e.key, e.value!, context)).toList(),
-    );
-  }
- Widget _sectionTitle(String title, IconData icon) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryBlue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-  Widget _warningBox(String text) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.orange.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber, color: Colors.orange, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
-          ],
-        ),
-      );
-
-  Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            SizedBox(
-                width: 140,
-                child: Text(k,
-                    style:
-                        const TextStyle(fontSize: 12, color: Colors.black54))),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(v.isEmpty ? '-' : v,
-                    style: const TextStyle(fontSize: 13))),
-          ],
-        ),
-      );
-
-
-
-  Widget _imageThumb(String label, String url, BuildContext context) {
-    return GestureDetector(
-      onTap: () => _openImageViewer(url, label, context),
-      child: Container(
-        width: 120,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppTheme.mediumGrey.withOpacity(0.2)),
-          color: AppTheme.lightGrey.withOpacity(0.4),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Center(
-                  child: Icon(Icons.broken_image_outlined, color: Colors.grey),
+  return Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                loadingBuilder: (ctx, child, progress) {
-                  if (progress == null) return child;
-                  return const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2));
-                },
+                child: const Icon(Icons.handyman_outlined,
+                    color: AppTheme.primaryBlue, size: 20),
               ),
-            ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              color: Colors.white,
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Installation Details',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
-        ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: installation.isSubmitted
+                      ? AppTheme.successGreen.withOpacity(0.1)
+                      : AppTheme.warningAmber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: installation.isSubmitted
+                        ? AppTheme.successGreen.withOpacity(0.3)
+                        : AppTheme.warningAmber.withOpacity(0.3),
+                  ),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: installation.isSubmitted
+                        ? AppTheme.successGreen
+                        : AppTheme.warningAmber,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          // Meta KV
+          _kv('Client Name', installation.clientName),
+          _kv('Contact', installation.contact),
+          _kv('Location', installation.location),
+          _kv('Installer', installation.installerName),
+          _kv('Assigned To (uid/email)', installation.assignTo ?? '-'),
+
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+
+          // Images grid
+          const Text(
+            'Installation Photos',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          _installationImagesGrid(installation, context),
+        ],
       ),
-    );
+    ),
+  );
+}
+
+Widget _installationImagesGrid(Installation i, BuildContext context) {
+  // label + value pairs
+  final items = <MapEntry<String, String?>>[
+    const MapEntry('Structure', null),
+    MapEntry('Structure', i.structureImage),
+    MapEntry('Wiring (AC)', i.wiringACImage),
+    MapEntry('Wiring (DC)', i.wiringDCImage),
+    MapEntry('Inverter', i.inverterImage),
+    MapEntry('Battery', i.batteryImage),
+    MapEntry('ACDB', i.acdbImage),
+    MapEntry('DCDB', i.dcdbImage),
+    MapEntry('Earthing', i.earthingImage),
+    MapEntry('Panels', i.panelsImage),
+    MapEntry('Civil', i.civilImage),
+    MapEntry('Civil Leg', i.civilLegImage),
+    MapEntry('Civil Earthing', i.civilEarthingImage),
+    MapEntry('Inverter ON', i.inverterOnImage),
+    MapEntry('App Install', i.appInstallImage),
+    MapEntry('Plant Inspection', i.plantInspectionImage),
+    MapEntry('Damp Proof/Sprinkler', i.dampProofSprinklerImage),
+  ].where((e) => e.value != null && (e.value ?? '').trim().isNotEmpty).toList();
+
+  if (items.isEmpty) {
+    return _warningBox('No photos uploaded yet.');
   }
 
-  void _openImageViewer(String url, String label,BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) {
-        final size = MediaQuery.of(context).size;
-        return Dialog(
-          insetPadding: const EdgeInsets.all(16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: size.width * 0.95,
-              maxHeight: size.height * 0.9,
+  // responsive wrap of thumbnails
+  return Wrap(
+    spacing: 12,
+    runSpacing: 12,
+    children: items.map((e) => _imageThumb(e.key, e.value!, context)).toList(),
+  );
+}
+
+Widget _sectionTitle(String title, IconData icon) {
+  return Row(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryBlue.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: AppTheme.primaryBlue, size: 20),
+      ),
+      const SizedBox(width: 12),
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _warningBox(String text) => Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber, color: Colors.orange, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+
+Widget _kv(String k, String v) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+              width: 140,
+              child: Text(k,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54))),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(v.isEmpty ? '-' : v,
+                  style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+
+Widget _imageThumb(String label, String url, BuildContext context) {
+  return GestureDetector(
+    onTap: () => _openImageViewer(url, label, context),
+    child: Container(
+      width: 120,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.mediumGrey.withOpacity(0.2)),
+        color: AppTheme.lightGrey.withOpacity(0.4),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Center(
+                child: Icon(Icons.broken_image_outlined, color: Colors.grey),
+              ),
+              loadingBuilder: (ctx, child, progress) {
+                if (progress == null) return child;
+                return const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2));
+              },
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                          color: AppTheme.mediumGrey.withOpacity(0.2)),
-                    ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            color: Colors.white,
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _openImageViewer(String url, String label, BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (_) {
+      final size = MediaQuery.of(context).size;
+      return Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: size.width * 0.95,
+            maxHeight: size.height * 0.9,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom:
+                        BorderSide(color: AppTheme.mediumGrey.withOpacity(0.2)),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.photo,
-                          color: AppTheme.primaryBlue, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.photo,
+                        color: AppTheme.primaryBlue, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
                 ),
-                // Viewer
-                Expanded(
-                  child: InteractiveViewer(
-                    minScale: 0.7,
-                    maxScale: 4,
-                    child: Center(
-                      child: Image.network(
-                        url,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.broken_image_outlined, size: 48),
-                      ),
+              ),
+              // Viewer
+              Expanded(
+                child: InteractiveViewer(
+                  minScale: 0.7,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.network(
+                      url,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image_outlined, size: 48),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}

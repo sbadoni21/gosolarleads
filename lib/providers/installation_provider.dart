@@ -125,7 +125,7 @@ class InstallationService {
     required String fieldName, // e.g. "structureImage"
     required String url,
   }) async {
-    await _db.collection('leadPool').doc(leadId).set({
+    await _db.collection('lead').doc(leadId).set({
       'installation': {
         fieldName: url,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -143,7 +143,7 @@ class InstallationService {
     required String leadId,
     required Installation installation,
   }) async {
-    final docRef = _db.collection('leadPool').doc(leadId);
+    final docRef = _db.collection('lead').doc(leadId);
 
     final installationMap = Map<String, dynamic>.from(installation.toMap());
     installationMap.removeWhere((k, v) => v == null);
@@ -154,7 +154,8 @@ class InstallationService {
         'updatedAt': FieldValue.serverTimestamp(),
       },
       'installationStatus': (installation.status == 'submitted'),
-      if (installation.status == 'submitted') 'status': 'installation_in_progress',
+      if (installation.status == 'submitted')
+        'status': 'installation_in_progress',
     }, SetOptions(merge: true));
 
     if (kDebugMode) {
@@ -171,7 +172,7 @@ class InstallationService {
     void Function(String key, double progress)? onProgress,
     void Function(String key, String url)? onFileUploaded,
   }) async {
-    final docRef = _db.collection('leadPool').doc(leadId);
+    final docRef = _db.collection('lead').doc(leadId);
 
     await docRef.set({
       'installation': {
@@ -179,7 +180,8 @@ class InstallationService {
         'updatedAt': FieldValue.serverTimestamp(),
       },
       'installationStatus': (installation.status == 'submitted'),
-      if (installation.status == 'submitted') 'status': 'installation_in_progress',
+      if (installation.status == 'submitted')
+        'status': 'installation_in_progress',
     }, SetOptions(merge: true));
 
     for (final entry in files.entries) {
@@ -224,7 +226,7 @@ class InstallationService {
 
   /// Live stream of installation map for this lead
   Stream<Map<String, dynamic>?> watchInstallationMap(String leadId) {
-    return _db.collection('leadPool').doc(leadId).snapshots().map((snap) {
+    return _db.collection('lead').doc(leadId).snapshots().map((snap) {
       final data = snap.data();
       if (data == null) return null;
       final inst = data['installation'];
@@ -237,7 +239,7 @@ class InstallationService {
     required String installerUid,
     required String installerName,
   }) async {
-    await _db.collection('leadPool').doc(leadId).update({
+    await _db.collection('lead').doc(leadId).update({
       'installationAssignedTo': installerUid,
       'installationAssignedToName': installerName,
       'installationAssignedAt': FieldValue.serverTimestamp(),
@@ -245,7 +247,7 @@ class InstallationService {
   }
 
   Future<Installation?> getInstallation(String leadId) async {
-    final doc = await _db.collection('leadPool').doc(leadId).get();
+    final doc = await _db.collection('lead').doc(leadId).get();
     final data = doc.data();
     if (data == null) return null;
     final map = data['installation'];
@@ -255,7 +257,7 @@ class InstallationService {
 
   Stream<List<LeadPool>> watchLeadsAssignedToInstaller(String installerUid) {
     return _db
-        .collection('leadPool')
+        .collection('lead')
         .where('installationAssignedTo', isEqualTo: installerUid)
         .orderBy('createdTime', descending: true)
         .snapshots()
@@ -265,7 +267,7 @@ class InstallationService {
   Future<List<LeadPool>> fetchLeadsAssignedToInstaller(
       String installerUid) async {
     final q = await _db
-        .collection('leadPool')
+        .collection('lead')
         .where('installationAssignedTo', isEqualTo: installerUid)
         .orderBy('createdTime', descending: true)
         .get();

@@ -129,7 +129,6 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
     }
   }
 
-
   // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
@@ -851,7 +850,7 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
             icon: const Icon(Icons.delete_outline, size: 20),
             onPressed: () async {
               await FirebaseFirestore.instance
-                  .collection('leadPool')
+                  .collection('lead')
                   .doc(lead.uid)
                   .collection('reminders')
                   .doc(r.id)
@@ -1334,8 +1333,6 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
       _showSnackbar(context, 'Error: $e', isError: true);
     }
   }
-
-
 
   void _showSnackbar(BuildContext context, String message,
       {bool isError = false, bool isSuccess = false}) {

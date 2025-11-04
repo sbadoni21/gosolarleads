@@ -15,15 +15,16 @@ class SurveyService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   /// Upload image to Firebase Storage
-  Future<String?> uploadImage(File imageFile, String leadId, String imageType) async {
+  Future<String?> uploadImage(
+      File imageFile, String leadId, String imageType) async {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = '${timestamp}_${imageType}.jpg';
       final ref = _storage.ref().child('survey/$leadId/$fileName');
-      
+
       final uploadTask = await ref.putFile(imageFile);
       final downloadUrl = await uploadTask.ref.getDownloadURL();
-      
+
       return downloadUrl;
     } catch (e) {
       print('Error uploading image: $e');
@@ -100,7 +101,7 @@ class SurveyService {
       );
 
       // Update lead with survey data
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'survey': updatedSurvey.toMap(),
         'surveyStatus': survey.status == 'submitted',
       });
@@ -115,13 +116,13 @@ class SurveyService {
   /// Get survey for a lead
   Future<Survey?> getSurvey(String leadId) async {
     try {
-      final doc = await _firestore.collection('leadPool').doc(leadId).get();
-      
+      final doc = await _firestore.collection('lead').doc(leadId).get();
+
       if (!doc.exists) return null;
-      
+
       final data = doc.data();
       if (data == null || data['survey'] == null) return null;
-      
+
       return Survey.fromMap(data['survey'] as Map<String, dynamic>);
     } catch (e) {
       print('❌ Error getting survey: $e');
@@ -132,7 +133,7 @@ class SurveyService {
   /// Update survey status
   Future<void> updateSurveyStatus(String leadId, String status) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'survey.status': status,
         'surveyStatus': status == 'submitted',
       });
@@ -148,7 +149,7 @@ class SurveyService {
     required String surveyorName,
   }) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'survey.assignTo': surveyorEmail,
         'survey.assignedTo': surveyorEmail,
         'survey.assignedToName': surveyorName,
@@ -165,17 +166,16 @@ class SurveyService {
   /// Get all surveys assigned to a surveyor
   Stream<List<Survey>> getSurveysByAssignee(String surveyorEmail) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .where('survey.assignTo', isEqualTo: surveyorEmail)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
           .where((doc) => doc.data()['survey'] != null)
           .map((doc) {
-            final surveyData = doc.data()['survey'] as Map<String, dynamic>;
-            return Survey.fromMap(surveyData);
-          })
-          .toList();
+        final surveyData = doc.data()['survey'] as Map<String, dynamic>;
+        return Survey.fromMap(surveyData);
+      }).toList();
     });
   }
 
@@ -183,7 +183,7 @@ class SurveyService {
   Future<Map<String, int>> getSurveyStatistics() async {
     try {
       final snapshot = await _firestore
-          .collection('leadPool')
+          .collection('lead')
           .where('survey', isNotEqualTo: null)
           .get();
 
@@ -195,7 +195,8 @@ class SurveyService {
         final data = doc.data();
         if (data['survey'] != null) {
           total++;
-          final status = data['survey']['status']?.toString().toLowerCase() ?? '';
+          final status =
+              data['survey']['status']?.toString().toLowerCase() ?? '';
           if (status == 'draft') {
             draft++;
           } else if (status == 'submitted') {
@@ -219,7 +220,7 @@ class SurveyService {
   Future<void> deleteSurvey(String leadId) async {
     try {
       final survey = await getSurvey(leadId);
-      
+
       if (survey != null) {
         // Delete all images
         if (survey.electricityBill != null) {
@@ -237,7 +238,7 @@ class SurveyService {
       }
 
       // Remove survey from lead
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'survey': FieldValue.delete(),
         'surveyStatus': false,
       });
@@ -250,9 +251,10 @@ class SurveyService {
 }
 
 // Stream provider for watching a specific survey
-final surveyStreamProvider = StreamProvider.family<Survey?, String>((ref, leadId) {
+final surveyStreamProvider =
+    StreamProvider.family<Survey?, String>((ref, leadId) {
   return FirebaseFirestore.instance
-      .collection('leadPool')
+      .collection('lead')
       .doc(leadId)
       .snapshots()
       .map((doc) {
@@ -264,26 +266,26 @@ final surveyStreamProvider = StreamProvider.family<Survey?, String>((ref, leadId
 });
 
 // Provider for surveys assigned to current user
-final myAssignedSurveysProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+final myAssignedSurveysProvider =
+    StreamProvider<List<Map<String, dynamic>>>((ref) {
   final user = ref.watch(currentUserProvider).value;
   if (user == null) return Stream.value(const []);
 
   return FirebaseFirestore.instance
-      .collection('leadPool')
+      .collection('lead')
       .where('survey.assignTo', isEqualTo: user.email)
       .snapshots()
       .map((snapshot) {
     return snapshot.docs
         .where((doc) => doc.data()['survey'] != null)
         .map((doc) {
-          final data = doc.data();
-          return {
-            'leadId': doc.id,
-            'leadName': data['name'] ?? '',
-            'survey': Survey.fromMap(data['survey'] as Map<String, dynamic>),
-          };
-        })
-        .toList();
+      final data = doc.data();
+      return {
+        'leadId': doc.id,
+        'leadName': data['name'] ?? '',
+        'survey': Survey.fromMap(data['survey'] as Map<String, dynamic>),
+      };
+    }).toList();
   });
 });
 

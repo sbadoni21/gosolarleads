@@ -37,14 +37,14 @@ class AccountsService {
   // -------------- Reads --------------
 
   Future<Accounts?> getAccounts(String leadId) async {
-    final doc = await _db.collection('leadPool').doc(leadId).get();
+    final doc = await _db.collection('lead').doc(leadId).get();
     final data = doc.data();
     if (data == null || data['accounts'] == null) return null;
     return Accounts.fromMap(Map<String, dynamic>.from(data['accounts']));
   }
 
   Future<LeadPool?> getLead(String leadId) async {
-    final doc = await _db.collection('leadPool').doc(leadId).get();
+    final doc = await _db.collection('lead').doc(leadId).get();
     if (!doc.exists) return null;
     return LeadPool.fromFirestore(doc);
   }
@@ -77,7 +77,7 @@ class AccountsService {
       });
     }
 
-    await _db.collection('leadPool').doc(leadId).update(updates);
+    await _db.collection('lead').doc(leadId).update(updates);
   }
 
   /// Explicitly starts the Accounts SLAs (7d first payment, 30d total).
@@ -85,7 +85,7 @@ class AccountsService {
     required String leadId,
   }) async {
     final now = DateTime.now();
-    await _db.collection('leadPool').doc(leadId).update({
+    await _db.collection('lead').doc(leadId).update({
       'accountsSlaStartDate': Timestamp.fromDate(now),
       'accountsFirstPaymentSlaEndDate':
           Timestamp.fromDate(now.add(const Duration(days: 7))),
@@ -97,13 +97,13 @@ class AccountsService {
   // -------------- Mark SLA completion (optional helpers) --------------
 
   Future<void> markFirstPaymentCompleted(String leadId) async {
-    await _db.collection('leadPool').doc(leadId).update({
+    await _db.collection('lead').doc(leadId).update({
       'accountsFirstPaymentCompletedAt': FieldValue.serverTimestamp(),
     });
   }
 
   Future<void> markTotalPaymentCompleted(String leadId) async {
-    await _db.collection('leadPool').doc(leadId).update({
+    await _db.collection('lead').doc(leadId).update({
       'accountsTotalPaymentCompletedAt': FieldValue.serverTimestamp(),
       'accountStatus': true, // fully paid
     });
@@ -144,7 +144,7 @@ class AccountsService {
     final entries = [...current.entries, newEntry];
 
     // get pitched amount robustly
-    final leadDoc = await _db.collection('leadPool').doc(leadId).get();
+    final leadDoc = await _db.collection('lead').doc(leadId).get();
     final leadData = leadDoc.data() ?? {};
     final pitchedRaw = leadData['pitchedAmount'];
     final double totalAmount = pitchedRaw is int
@@ -182,8 +182,8 @@ class AccountsService {
     }
 
     // If this is the very first payment OR explicitly installment == 1 -> complete first-payment SLA
-    final isFirstPayment =
-        (current.entries.isEmpty) || (payment.installment != null && payment.installment == 1);
+    final isFirstPayment = (current.entries.isEmpty) ||
+        (payment.installment != null && payment.installment == 1);
     if (isFirstPayment) {
       updates['accountsFirstPaymentCompletedAt'] = FieldValue.serverTimestamp();
     }
@@ -193,7 +193,7 @@ class AccountsService {
       updates['accountsTotalPaymentCompletedAt'] = FieldValue.serverTimestamp();
     }
 
-    await _db.collection('leadPool').doc(leadId).update(updates);
+    await _db.collection('lead').doc(leadId).update(updates);
   }
 
   // -------------- Streams --------------
@@ -203,7 +203,7 @@ class AccountsService {
     // If you get index errors, remove orderBy or create a composite index:
     // accountsAssignedTo ASC, createdTime DESC
     return _db
-        .collection('leadPool')
+        .collection('lead')
         .where('accountsAssignedTo', isEqualTo: accountsUid)
         .orderBy('createdTime', descending: true)
         .snapshots()
@@ -228,19 +228,20 @@ class AccountsUser {
     final m = (d.data() as Map<String, dynamic>? ?? {});
     return AccountsUser(
       uid: d.id,
-      name:
-          (m['name'] ?? m['displayName'] ?? m['email'] ?? 'Accounts').toString(),
+      name: (m['name'] ?? m['displayName'] ?? m['email'] ?? 'Accounts')
+          .toString(),
       email: (m['email'] ?? '').toString(),
       photoUrl: m['photoURL'] as String?,
     );
-    }
+  }
 }
 
 /// Stream all users with role == 'accounts' (include a few variants)
 final accountsUsersProvider = StreamProvider<List<AccountsUser>>((ref) {
   final col = FirebaseFirestore.instance.collection('users');
   // If your DB strictly uses 'accounts', change to .isEqualTo('accounts').
-  final q = col.where('role', whereIn: ['accounts', 'account', 'finance', 'billing']);
+  final q =
+      col.where('role', whereIn: ['accounts', 'account', 'finance', 'billing']);
   return q.snapshots().map((s) {
     final list = s.docs.map(AccountsUser.fromDoc).toList();
     list.sort((a, b) => (a.name.isNotEmpty ? a.name : a.email)

@@ -27,7 +27,7 @@ final myAssignedLeadsStreamProvider = StreamProvider<List<LeadPool>>((ref) {
   if (user == null) return Stream.value(const []);
 
   return FirebaseFirestore.instance
-      .collection('leadPool')
+      .collection('lead')
       .where('assignedTo', isEqualTo: user.uid)
       .orderBy('createdTime', descending: true)
       .snapshots()
@@ -37,7 +37,7 @@ final myAssignedLeadsStreamProvider = StreamProvider<List<LeadPool>>((ref) {
 // Stream of all leads
 final allLeadsProvider = StreamProvider<List<LeadPool>>((ref) {
   return FirebaseFirestore.instance
-      .collection('leadPool')
+      .collection('lead')
       .orderBy('createdTime', descending: true)
       .snapshots()
       .map((snapshot) {
@@ -54,7 +54,7 @@ final myLeadsProvider = StreamProvider<List<LeadPool>>((ref) {
   }
 
   return FirebaseFirestore.instance
-      .collection('leadPool')
+      .collection('lead')
       .where('createdBy', isEqualTo: user.email)
       .orderBy('createdTime', descending: true)
       .snapshots()
@@ -67,7 +67,7 @@ final myLeadsProvider = StreamProvider<List<LeadPool>>((ref) {
 final leadsByStatusProvider =
     StreamProvider.family<List<LeadPool>, String>((ref, status) {
   return FirebaseFirestore.instance
-      .collection('leadPool')
+      .collection('lead')
       .where('status', isEqualTo: status)
       .orderBy('createdTime', descending: true)
       .snapshots()
@@ -86,7 +86,7 @@ class LeadService {
 
   Future<String> addLead(LeadPool lead) async {
     try {
-      final docRef = _firestore.collection('leadPool').doc(lead.uid);
+      final docRef = _firestore.collection('lead').doc(lead.uid);
 
       // Optional: prevent accidental overwrite if the uid already exists
       final exists = (await docRef.get()).exists;
@@ -104,7 +104,7 @@ class LeadService {
   // Update a lead
   Future<void> updateLead(String leadId, Map<String, dynamic> updates) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update(updates);
+      await _firestore.collection('lead').doc(leadId).update(updates);
     } catch (e) {
       throw 'Failed to update lead: ${e.toString()}';
     }
@@ -113,7 +113,7 @@ class LeadService {
   // Delete a lead
   Future<void> deleteLead(String leadId) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).delete();
+      await _firestore.collection('lead').doc(leadId).delete();
     } catch (e) {
       throw 'Failed to delete lead: ${e.toString()}';
     }
@@ -122,7 +122,7 @@ class LeadService {
   // Get a single lead by ID
   Future<LeadPool?> getLeadById(String leadId) async {
     try {
-      final doc = await _firestore.collection('leadPool').doc(leadId).get();
+      final doc = await _firestore.collection('lead').doc(leadId).get();
       if (doc.exists) {
         return LeadPool.fromFirestore(doc);
       }
@@ -135,7 +135,7 @@ class LeadService {
   // Update lead status
   Future<void> updateLeadStatus(String leadId, String status) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'status': status,
       });
     } catch (e) {
@@ -146,7 +146,7 @@ class LeadService {
   // Update survey status
   Future<void> updateSurveyStatus(String leadId, bool surveyStatus) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'surveyStatus': surveyStatus,
       });
     } catch (e) {
@@ -164,7 +164,7 @@ class LeadService {
     final fieldPrefix =
         slaType == 'registration' ? 'registration' : 'installation';
 
-    await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
+    await FirebaseFirestore.instance.collection('lead').doc(leadId).update({
       '${fieldPrefix}SlaBreachReason': reason,
       '${fieldPrefix}SlaBreachRecordedAt': FieldValue.serverTimestamp(),
       '${fieldPrefix}SlaBreachRecordedBy': recordedByName,
@@ -182,7 +182,7 @@ class LeadService {
   // Update account status
   Future<void> updateAccountStatus(String leadId, bool accountStatus) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'accountStatus': accountStatus,
       });
     } catch (e) {
@@ -193,7 +193,7 @@ class LeadService {
   // Update offer
   Future<void> updateOffer(String leadId, Offer offer) async {
     try {
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'offer': offer.toMap(),
       });
     } catch (e) {
@@ -203,7 +203,7 @@ class LeadService {
 
   // Watch a lead by ID
   Stream<LeadPool?> watchLeadById(String id) {
-    return _firestore.collection('leadPool').doc(id).snapshots().map((doc) {
+    return _firestore.collection('lead').doc(id).snapshots().map((doc) {
       if (!doc.exists) return null;
       return LeadPool.fromFirestore(doc);
     });
@@ -214,7 +214,7 @@ class LeadService {
       final now = DateTime.now();
       final registrationSlaEnd = now.add(const Duration(days: 3));
 
-      await _firestore.collection('leadPool').doc(leadId).update({
+      await _firestore.collection('lead').doc(leadId).update({
         'registrationSlaStartDate': Timestamp.fromDate(now),
         'registrationSlaEndDate': Timestamp.fromDate(registrationSlaEnd),
         'registrationCompletedAt': null,
@@ -235,7 +235,7 @@ class LeadService {
     required String text,
   }) async {
     final col =
-        _firestore.collection('leadPool').doc(leadId).collection('comments');
+        _firestore.collection('lead').doc(leadId).collection('comments');
     await col.add({
       'leadId': leadId,
       'authorUid': authorUid,
@@ -254,11 +254,8 @@ class LeadService {
     required DateTime scheduledAt,
   }) async {
     final batch = _firestore.batch();
-    final rDoc = _firestore
-        .collection('leadPool')
-        .doc(leadId)
-        .collection('reminders')
-        .doc();
+    final rDoc =
+        _firestore.collection('lead').doc(leadId).collection('reminders').doc();
     batch.set(rDoc, {
       'leadId': leadId,
       'ownerUid': ownerUid,
@@ -287,7 +284,7 @@ class LeadService {
 
   Future<void> markReminderDone(String leadId, String reminderId, bool done) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .doc(leadId)
         .collection('reminders')
         .doc(reminderId)
@@ -319,7 +316,7 @@ class LeadService {
         'rejectedAt': FieldValue.delete(),
       });
     }
-    await _firestore.collection('leadPool').doc(leadId).update(data);
+    await _firestore.collection('lead').doc(leadId).update(data);
   }
 
   /// Toggle boolean milestones and optionally attach proof URL(s).
@@ -342,13 +339,10 @@ class LeadService {
 
     // store proof as subcollection item for audit/history
     if (proofUrl != null && proofUrl.isNotEmpty) {
-      final proofDoc = _firestore
-          .collection('leadPool')
-          .doc(leadId)
-          .collection('proofs')
-          .doc();
+      final proofDoc =
+          _firestore.collection('lead').doc(leadId).collection('proofs').doc();
       await _firestore.runTransaction((tx) async {
-        tx.update(_firestore.collection('leadPool').doc(leadId), updates);
+        tx.update(_firestore.collection('lead').doc(leadId), updates);
         tx.set(proofDoc, {
           'url': proofUrl,
           'label': proofLabel ?? 'Proof',
@@ -361,14 +355,14 @@ class LeadService {
     }
 
     if (updates.isNotEmpty) {
-      await _firestore.collection('leadPool').doc(leadId).update(updates);
+      await _firestore.collection('lead').doc(leadId).update(updates);
     }
   }
 
   /// Streams
   Stream<List<LeadComment>> watchComments(String leadId) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .doc(leadId)
         .collection('comments')
         .orderBy('createdAt', descending: true)
@@ -378,7 +372,7 @@ class LeadService {
 
   Stream<List<LeadReminder>> watchReminders(String leadId) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .doc(leadId)
         .collection('reminders')
         .orderBy('scheduledAt')
@@ -395,7 +389,7 @@ class LeadService {
     final now = DateTime.now();
     final registrationSlaEnd = now.add(const Duration(days: 3));
 
-    await _firestore.collection('leadPool').doc(leadId).update({
+    await _firestore.collection('lead').doc(leadId).update({
       'assignedTo': soUid,
       'assignedToName': soName,
       'assignedAt': Timestamp.fromDate(now),
@@ -413,7 +407,7 @@ class LeadService {
 
   /// Unassign a sales officer from a lead and clear all SLAs
   Future<void> unassignSalesOfficer(String leadId) async {
-    await _firestore.collection('leadPool').doc(leadId).update({
+    await _firestore.collection('lead').doc(leadId).update({
       'assignedTo': null,
       'assignedToName': null,
       'assignedAt': null,
@@ -433,7 +427,7 @@ class LeadService {
     final now = DateTime.now();
     final installationSlaEnd = now.add(const Duration(days: 30));
 
-    await _firestore.collection('leadPool').doc(leadId).update({
+    await _firestore.collection('lead').doc(leadId).update({
       'registrationCompletedAt': Timestamp.fromDate(now),
       // Start Installation SLA
       'installationSlaStartDate': Timestamp.fromDate(now),
@@ -446,7 +440,7 @@ class LeadService {
   Future<void> completeInstallation(String leadId) async {
     final now = DateTime.now();
 
-    await _firestore.collection('leadPool').doc(leadId).update({
+    await _firestore.collection('lead').doc(leadId).update({
       'installationCompletedAt': Timestamp.fromDate(now),
       'status':
           'completed', // Changed from 'installation_complete' to 'completed'
@@ -458,7 +452,7 @@ class LeadService {
   /// Get all leads with active breached SLAs
   Future<List<LeadPool>> getBreachedSlaLeads() async {
     final snapshot = await _firestore
-        .collection('leadPool')
+        .collection('lead')
         .where('assignedTo', isNull: false)
         .get();
 
@@ -474,7 +468,7 @@ class LeadService {
   /// Get all leads with active SLAs for a specific SO
   Future<List<LeadPool>> getActiveSlaLeadsForSO(String soUid) async {
     final snapshot = await _firestore
-        .collection('leadPool')
+        .collection('lead')
         .where('assignedTo', isEqualTo: soUid)
         .get();
 
@@ -496,7 +490,7 @@ class LeadService {
   }) async {
     final now = DateTime.now();
     final end = now.add(Duration(days: slaDays));
-    await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
+    await FirebaseFirestore.instance.collection('lead').doc(leadId).update({
       'installationAssignedTo': installerUid,
       'installationAssignedToName': installerName,
       'installationAssignedAt': Timestamp.fromDate(now),
@@ -509,7 +503,7 @@ class LeadService {
   // Get leads by location
   Stream<List<LeadPool>> getLeadsByLocation(String location) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .where('location', isEqualTo: location)
         .orderBy('createdTime', descending: true)
         .snapshots()
@@ -521,7 +515,7 @@ class LeadService {
   // Get leads by state
   Stream<List<LeadPool>> getLeadsByState(String state) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .where('state', isEqualTo: state)
         .orderBy('createdTime', descending: true)
         .snapshots()
@@ -533,7 +527,7 @@ class LeadService {
   // Search leads by name
   Stream<List<LeadPool>> searchLeadsByName(String query) {
     return _firestore
-        .collection('leadPool')
+        .collection('lead')
         .orderBy('name')
         .startAt([query])
         .endAt(['$query\uf8ff'])
@@ -548,7 +542,7 @@ class LeadService {
   // Get statistics
   Future<Map<String, int>> getLeadStatistics() async {
     try {
-      final snapshot = await _firestore.collection('leadPool').get();
+      final snapshot = await _firestore.collection('lead').get();
 
       int total = snapshot.docs.length;
       int submitted = 0;

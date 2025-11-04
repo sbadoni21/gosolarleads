@@ -1,317 +1,260 @@
-  import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 // lib/screens/leads/sales_lead_screen.dart
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gosolarleads/models/leadpool.dart';
 import 'package:gosolarleads/models/operations_models.dart';
 import 'package:gosolarleads/providers/auth_provider.dart';
 import 'package:gosolarleads/providers/leadpool_provider.dart';
 import 'package:gosolarleads/providers/operations_provider.dart';
-import 'package:gosolarleads/screens/leads/tabs/installation_assignment_card.dart';
-import 'package:gosolarleads/screens/leads/tabs/survey_tab_sales_details.dart';
+
 import 'package:gosolarleads/theme/app_theme.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 
-Widget operationsAssignmentCard(BuildContext context, LeadPool lead, WidgetRef ref) {
-    final opsStream = FirebaseFirestore.instance
-        .collection('leadPool')
-        .doc(lead.uid)
-        .snapshots()
-        .map((snap) {
-      final data = snap.data();
-      final ops = data?['operations'];
-      return (ops is Map<String, dynamic>)
-          ? Map<String, dynamic>.from(ops)
-          : null;
-    });
+Widget operationsAssignmentCard(
+    BuildContext context, LeadPool lead, WidgetRef ref) {
+  final opsStream = FirebaseFirestore.instance
+      .collection('lead')
+      .doc(lead.uid)
+      .snapshots()
+      .map((snap) {
+    final data = snap.data();
+    final ops = data?['operations'];
+    return (ops is Map<String, dynamic>)
+        ? Map<String, dynamic>.from(ops)
+        : null;
+  });
 
-    String pickNonEmpty(List<String?> xs) => xs
-        .firstWhere((s) => (s ?? '').trim().isNotEmpty, orElse: () => '')!
-        .trim();
+  String pickNonEmpty(List<String?> xs) => xs
+      .firstWhere((s) => (s ?? '').trim().isNotEmpty, orElse: () => '')!
+      .trim();
 
-    final isAdmin = (ref.read(currentUserProvider).value?.isAdmin ?? false) ||
-        (ref.read(currentUserProvider).value?.isSuperAdmin ?? false) ||
-        (ref.read(currentUserProvider).value?.isSales ?? false);
+  final isAdmin = (ref.read(currentUserProvider).value?.isAdmin ?? false) ||
+      (ref.read(currentUserProvider).value?.isSuperAdmin ?? false) ||
+      (ref.read(currentUserProvider).value?.isSales ?? false);
 
-    return StreamBuilder<Map<String, dynamic>?>(
-      stream: opsStream,
-      builder: (context, snap) {
-        final ops = snap.data;
-        final assignedName = pickNonEmpty([
-          lead.operationsAssignedToName,
-          ops?['assignToName'] as String?,
-          lead.operationsAssignedTo,
-          ops?['assignTo'] as String?,
-        ]);
-        final hasOps = assignedName.isNotEmpty;
+  return StreamBuilder<Map<String, dynamic>?>(
+    stream: opsStream,
+    builder: (context, snap) {
+      final ops = snap.data;
+      final assignedName = pickNonEmpty([
+        lead.operationsAssignedToName,
+        ops?['assignToName'] as String?,
+        lead.operationsAssignedTo,
+        ops?['assignTo'] as String?,
+      ]);
+      final hasOps = assignedName.isNotEmpty;
 
-        return Card(
-          elevation: 0,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: Colors.black12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: const [
-                  Icon(Icons.assignment, color: Colors.blue, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text('Operations Assignment',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 16)),
+      return Card(
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: Colors.black12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: const [
+                Icon(Icons.assignment, color: Colors.blue, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Operations Assignment',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: hasOps
+                      ? Colors.green.withOpacity(0.08)
+                      : Colors.orange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: (hasOps ? Colors.green : Colors.orange)
+                        .withOpacity(0.25),
                   ),
-                ]),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: hasOps
-                        ? Colors.green.withOpacity(0.08)
-                        : Colors.orange.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: (hasOps ? Colors.green : Colors.orange)
-                          .withOpacity(0.25),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: (hasOps ? Colors.green : Colors.orange)
+                          .withOpacity(0.12),
+                      child: Icon(
+                        hasOps
+                            ? Icons.verified_user_outlined
+                            : Icons.person_search_outlined,
+                        size: 18,
+                        color: hasOps ? Colors.green : Colors.orange,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: (hasOps ? Colors.green : Colors.orange)
-                            .withOpacity(0.12),
-                        child: Icon(
-                          hasOps
-                              ? Icons.verified_user_outlined
-                              : Icons.person_search_outlined,
-                          size: 18,
-                          color: hasOps ? Colors.green : Colors.orange,
-                        ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        hasOps
+                            ? 'Assigned to $assignedName'
+                            : 'No operations person assigned',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          hasOps
-                              ? 'Assigned to $assignedName'
-                              : 'No operations person assigned',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isAdmin)
-                        FilledButton.tonalIcon(
-                          onPressed: () async {
-                            // pick ops user
-                            final qs = await FirebaseFirestore.instance
-                                .collection('users')
-                                .where('role', isEqualTo: 'operation')
-                                .orderBy('name')
-                                .get();
+                    ),
+                    if (isAdmin)
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          // pick ops user
+                          final qs = await FirebaseFirestore.instance
+                              .collection('users')
+                              .where('role', isEqualTo: 'operation')
+                              .orderBy('name')
+                              .get();
 
-                            if (!context.mounted) return;
+                          if (!context.mounted) return;
 
-                            await showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Assign Operations'),
-                                content: SizedBox(
-                                  width: double.maxFinite,
-                                  child: ListView.separated(
-                                    shrinkWrap: true,
-                                    itemCount: qs.docs.length,
-                                    separatorBuilder: (_, __) =>
-                                        const Divider(height: 0),
-                                    itemBuilder: (_, i) {
-                                      final d = qs.docs[i];
-                                      final uid = d.id;
-                                      final display =
-                                          (d['name'] ?? d['email'] ?? 'User')
-                                              .toString();
-                                      final email =
-                                          (d['email'] ?? '').toString();
-                                      return ListTile(
-                                        leading: CircleAvatar(
-                                          child: Text(display
-                                              .substring(0, 1)
-                                              .toUpperCase()),
-                                        ),
-                                        title: Text(display),
-                                        subtitle: Text(email),
-                                        onTap: () async {
-                                          Navigator.pop(ctx);
-                                          await FirebaseFirestore.instance
-                                              .collection('leadPool')
-                                              .doc(lead.uid)
-                                              .update({
-                                            // flat
-                                            'operationsAssignedTo': uid,
-                                            'operationsAssignedToName': display,
-                                            'operationsAssignedAt':
-                                                FieldValue.serverTimestamp(),
-                                            // nested
-                                            'operations.assignTo': uid,
-                                            'operations.assignToName': display,
-                                            'operations.updatedAt':
-                                                FieldValue.serverTimestamp(),
-                                          });
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      'Operations assigned to $display')),
-                                            );
-                                            // If you cache, invalidate provider here
-                                            ref.invalidate(
-                                                leadStreamProvider(lead.uid));
-                                          }
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  if (hasOps)
-                                    TextButton(
-                                      onPressed: () async {
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Assign Operations'),
+                              content: SizedBox(
+                                width: double.maxFinite,
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: qs.docs.length,
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 0),
+                                  itemBuilder: (_, i) {
+                                    final d = qs.docs[i];
+                                    final uid = d.id;
+                                    final display =
+                                        (d['name'] ?? d['email'] ?? 'User')
+                                            .toString();
+                                    final email = (d['email'] ?? '').toString();
+                                    return ListTile(
+                                      leading: CircleAvatar(
+                                        child: Text(display
+                                            .substring(0, 1)
+                                            .toUpperCase()),
+                                      ),
+                                      title: Text(display),
+                                      subtitle: Text(email),
+                                      onTap: () async {
                                         Navigator.pop(ctx);
                                         await FirebaseFirestore.instance
-                                            .collection('leadPool')
+                                            .collection('lead')
                                             .doc(lead.uid)
                                             .update({
                                           // flat
-                                          'operationsAssignedTo': null,
-                                          'operationsAssignedToName': null,
-                                          'operationsAssignedAt': null,
+                                          'operationsAssignedTo': uid,
+                                          'operationsAssignedToName': display,
+                                          'operationsAssignedAt':
+                                              FieldValue.serverTimestamp(),
                                           // nested
-                                          'operations.assignTo': null,
-                                          'operations.assignToName': null,
+                                          'operations.assignTo': uid,
+                                          'operations.assignToName': display,
                                           'operations.updatedAt':
                                               FieldValue.serverTimestamp(),
                                         });
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
-                                            const SnackBar(
+                                            SnackBar(
                                                 content: Text(
-                                                    'Operations unassigned')),
+                                                    'Operations assigned to $display')),
                                           );
+                                          // If you cache, invalidate provider here
                                           ref.invalidate(
                                               leadStreamProvider(lead.uid));
                                         }
                                       },
-                                      child: const Text('Unassign'),
-                                    ),
-                                ],
+                                    );
+                                  },
+                                ),
                               ),
-                            );
-                          },
-                          icon: Icon(hasOps
-                              ? Icons.swap_horiz
-                              : Icons.person_add_alt_1),
-                          label: Text(hasOps ? 'Reassign' : 'Assign'),
-                        ),
-                    ],
-                  ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text('Cancel'),
+                                ),
+                                if (hasOps)
+                                  TextButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await FirebaseFirestore.instance
+                                          .collection('lead')
+                                          .doc(lead.uid)
+                                          .update({
+                                        // flat
+                                        'operationsAssignedTo': null,
+                                        'operationsAssignedToName': null,
+                                        'operationsAssignedAt': null,
+                                        // nested
+                                        'operations.assignTo': null,
+                                        'operations.assignToName': null,
+                                        'operations.updatedAt':
+                                            FieldValue.serverTimestamp(),
+                                      });
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Operations unassigned')),
+                                        );
+                                        ref.invalidate(
+                                            leadStreamProvider(lead.uid));
+                                      }
+                                    },
+                                    child: const Text('Unassign'),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                        icon: Icon(
+                            hasOps ? Icons.swap_horiz : Icons.person_add_alt_1),
+                        label: Text(hasOps ? 'Reassign' : 'Assign'),
+                      ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
 // Add to your existing widget
-  Widget operationsDetailsCard(LeadPool lead, WidgetRef ref) {
-    final opsStream = FirebaseFirestore.instance
-        .collection('leadPool')
-        .doc(lead.uid)
-        .snapshots()
-        .map((snap) {
-      final data = snap.data();
-      final ops = data?['operations'];
-      return (ops is Map<String, dynamic>)
-          ? Map<String, dynamic>.from(ops)
-          : null;
-    });
+Widget operationsDetailsCard(LeadPool lead, WidgetRef ref) {
+  final opsStream = FirebaseFirestore.instance
+      .collection('lead')
+      .doc(lead.uid)
+      .snapshots()
+      .map((snap) {
+    final data = snap.data();
+    final ops = data?['operations'];
+    return (ops is Map<String, dynamic>)
+        ? Map<String, dynamic>.from(ops)
+        : null;
+  });
 
-    String _s(dynamic x) => (x is String && x.trim().isNotEmpty) ? x : '-';
+  String _s(dynamic x) => (x is String && x.trim().isNotEmpty) ? x : '-';
 
-    return StreamBuilder<Map<String, dynamic>?>(
-      stream: opsStream,
-      builder: (context, snap) {
-        final ops = snap.data;
-        if (ops == null) {
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.grey.shade200),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.engineering_outlined,
-                            color: Colors.blue, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Operations',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No operations record yet.',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final status = _s(ops['status']).toUpperCase();
-        final statusColor = status == 'SUBMITTED'
-            ? Colors.green
-            : status == 'DRAFT'
-                ? Colors.orange
-                : Colors.grey;
-
+  return StreamBuilder<Map<String, dynamic>?>(
+    stream: opsStream,
+    builder: (context, snap) {
+      final ops = snap.data;
+      if (ops == null) {
         return Card(
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -323,7 +266,6 @@ Widget operationsAssignmentCard(BuildContext context, LeadPool lead, WidgetRef r
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   children: [
                     Container(
@@ -336,148 +278,202 @@ Widget operationsAssignmentCard(BuildContext context, LeadPool lead, WidgetRef r
                           color: Colors.blue, size: 22),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Operations',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: statusColor.withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            status == 'SUBMITTED'
-                                ? Icons.check_circle
-                                : status == 'DRAFT'
-                                    ? Icons.edit_note
-                                    : Icons.info_outline,
-                            size: 16,
-                            color: statusColor.shade700,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            status.isEmpty ? 'DRAFT' : status,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: statusColor.shade700,
-                            ),
-                          ),
-                        ],
+                    const Text(
+                      'Operations',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Assignee Info
-                if (_s(ops['assignToName']) != '-')
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_outline,
-                            size: 18, color: Colors.grey.shade700),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Assigned to: ',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        Text(
-                          _s(ops['assignToName']),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 16),
-
-                // Documents Section
-                const Text(
-                  'Documents',
+                Text(
+                  'No operations record yet.',
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                _buildDocumentUploadSection(
-                  context: context,
-                  ref: ref,
-                  lead: lead,
-                  documents: [
-                    _DocumentItem(
-                      title: 'Acknowledgement',
-                      url: _s(ops['operationPdf1Url']),
-                      fileKey: 'operationPdf1',
-                      icon: Icons.receipt_long_outlined,
-                      color: Colors.blue,
-                    ),
-                    _DocumentItem(
-                      title: 'Feasibility Report',
-                      url: _s(ops['operationPdf2Url']),
-                      fileKey: 'operationPdf2',
-                      icon: Icons.assessment_outlined,
-                      color: Colors.green,
-                    ),
-                    _DocumentItem(
-                      title: 'Jansamarth Registration',
-                      url: _s(ops['jansamarthPdfUrl']),
-                      fileKey: 'jansamarthPdf',
-                      icon: Icons.how_to_reg_outlined,
-                      color: Colors.orange,
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
         );
-      },
-    );
-  }
+      }
 
-  void _showSnackbar(BuildContext context, String message,
-      {bool isError = false, bool isSuccess = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError
-            ? AppTheme.errorRed
-            : isSuccess
-                ? AppTheme.successGreen
-                : AppTheme.primaryBlue,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
+      final status = _s(ops['status']).toUpperCase();
+      final statusColor = status == 'SUBMITTED'
+          ? Colors.green
+          : status == 'DRAFT'
+              ? Colors.orange
+              : Colors.grey;
+
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.engineering_outlined,
+                        color: Colors.blue, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Operations',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: statusColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          status == 'SUBMITTED'
+                              ? Icons.check_circle
+                              : status == 'DRAFT'
+                                  ? Icons.edit_note
+                                  : Icons.info_outline,
+                          size: 16,
+                          color: statusColor.shade700,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          status.isEmpty ? 'DRAFT' : status,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Assignee Info
+              if (_s(ops['assignToName']) != '-')
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline,
+                          size: 18, color: Colors.grey.shade700),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Assigned to: ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      Text(
+                        _s(ops['assignToName']),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+
+              // Documents Section
+              const Text(
+                'Documents',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              _buildDocumentUploadSection(
+                context: context,
+                ref: ref,
+                lead: lead,
+                documents: [
+                  _DocumentItem(
+                    title: 'Acknowledgement',
+                    url: _s(ops['operationPdf1Url']),
+                    fileKey: 'operationPdf1',
+                    icon: Icons.receipt_long_outlined,
+                    color: Colors.blue,
+                  ),
+                  _DocumentItem(
+                    title: 'Feasibility Report',
+                    url: _s(ops['operationPdf2Url']),
+                    fileKey: 'operationPdf2',
+                    icon: Icons.assessment_outlined,
+                    color: Colors.green,
+                  ),
+                  _DocumentItem(
+                    title: 'Jansamarth Registration',
+                    url: _s(ops['jansamarthPdfUrl']),
+                    fileKey: 'jansamarthPdf',
+                    icon: Icons.how_to_reg_outlined,
+                    color: Colors.orange,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+void _showSnackbar(BuildContext context, String message,
+    {bool isError = false, bool isSuccess = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: isError
+          ? AppTheme.errorRed
+          : isSuccess
+              ? AppTheme.successGreen
+              : AppTheme.primaryBlue,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
 
 class _DocumentItem {
   final String title;

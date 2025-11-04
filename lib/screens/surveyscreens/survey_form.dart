@@ -96,7 +96,7 @@ class _SurveyFormScreenState extends ConsumerState<SurveyFormScreen> {
 
     // Listen to lead for installation SLA end date (commitment date)
     FirebaseFirestore.instance
-        .collection('leadPool')
+        .collection('lead')
         .doc(widget.leadId)
         .snapshots()
         .listen((snap) {

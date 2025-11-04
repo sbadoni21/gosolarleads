@@ -72,7 +72,7 @@ class OperationsService {
       await _setUrl(e.key, e.value);
     }
 
-    await _db.collection('leadPool').doc(leadId).update({
+    await _db.collection('lead').doc(leadId).update({
       'operations': ops.toMap(),
       // optional boolean flag for quick filtering
       'operationsStatus': ops.isSubmitted,
@@ -80,7 +80,7 @@ class OperationsService {
   }
 
   Future<Operations?> getOperations(String leadId) async {
-    final doc = await _db.collection('leadPool').doc(leadId).get();
+    final doc = await _db.collection('lead').doc(leadId).get();
     final data = doc.data();
     if (data == null || data['operations'] == null) return null;
     return Operations.fromMap(Map<String, dynamic>.from(data['operations']));
@@ -91,7 +91,7 @@ class OperationsService {
     required String opsUid,
     required String opsName,
   }) async {
-    await FirebaseFirestore.instance.collection('leadPool').doc(leadId).update({
+    await FirebaseFirestore.instance.collection('lead').doc(leadId).update({
       'operationsAssignedTo': null,
       'operationsAssignedToName': null,
       'operationsAssignedAt': null,
@@ -104,7 +104,7 @@ class OperationsService {
 // in your Service class
   Stream<Map<String, dynamic>?> watchOperationsMap(String leadId) {
     return FirebaseFirestore.instance
-        .collection('leadPool')
+        .collection('lead')
         .doc(leadId)
         .snapshots()
         .map((snap) {
@@ -118,7 +118,7 @@ class OperationsService {
 
   Stream<List<LeadPool>> watchLeadsAssignedToOperations(String opsUid) {
     return _db
-        .collection('leadPool')
+        .collection('lead')
         .where('operationsAssignedTo', isEqualTo: opsUid)
         .orderBy('createdTime', descending: true)
         .snapshots()

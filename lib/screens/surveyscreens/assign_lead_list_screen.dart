@@ -4,13 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gosolarleads/screens/surveyscreens/surveyor_select_screen.dart';
 import 'package:intl/intl.dart';
 
-
-
 class AssignLeadListScreen extends ConsumerStatefulWidget {
   const AssignLeadListScreen({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<AssignLeadListScreen> createState() => _AssignLeadListScreenState();
+  ConsumerState<AssignLeadListScreen> createState() =>
+      _AssignLeadListScreenState();
 }
 
 class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
@@ -44,7 +43,7 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
   Widget build(BuildContext context) {
     // Full list, we filter in client for "Unassigned" tab for simplicity (no schema change).
     final leadQuery = FirebaseFirestore.instance
-        .collection('leadPool')
+        .collection('lead')
         .orderBy('createdTime', descending: true)
         .snapshots();
 
@@ -97,20 +96,26 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
                 List<Map<String, dynamic>> searchFiltered = allLeads.where((l) {
                   if (_search.isEmpty) return true;
                   final hay =
-                      '${l['name']} ${l['number']} ${l['location']} ${l['state']} ${l['assignedToName']}'.toLowerCase();
+                      '${l['name']} ${l['number']} ${l['location']} ${l['state']} ${l['assignedToName']}'
+                          .toLowerCase();
                   return hay.contains(_search);
                 }).toList();
 
                 // Tab filter
                 final isUnassignedTab = _tabController.index == 0;
                 final items = isUnassignedTab
-                    ? searchFiltered.where((l) => _isSurveyUnassigned(l['survey'] as Map<String, dynamic>?)).toList()
+                    ? searchFiltered
+                        .where((l) => _isSurveyUnassigned(
+                            l['survey'] as Map<String, dynamic>?))
+                        .toList()
                     : searchFiltered;
 
                 if (items.isEmpty) {
                   return Center(
                     child: Text(
-                      isUnassignedTab ? 'No unassigned leads found' : 'No leads found',
+                      isUnassignedTab
+                          ? 'No unassigned leads found'
+                          : 'No leads found',
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   );
@@ -127,7 +132,8 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
 
                     return Card(
                       elevation: 1,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
@@ -149,7 +155,8 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
                               CircleAvatar(
                                 radius: 20,
                                 backgroundColor: Colors.indigo.shade50,
-                                child: Icon(Icons.person, color: Colors.indigo.shade700),
+                                child: Icon(Icons.person,
+                                    color: Colors.indigo.shade700),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -168,15 +175,23 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
                                           ),
                                         ),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: unassigned ? Colors.orange[100] : Colors.green[100],
-                                            borderRadius: BorderRadius.circular(20),
+                                            color: unassigned
+                                                ? Colors.orange[100]
+                                                : Colors.green[100],
+                                            borderRadius:
+                                                BorderRadius.circular(20),
                                           ),
                                           child: Text(
-                                            unassigned ? 'Unassigned' : 'Assigned',
+                                            unassigned
+                                                ? 'Unassigned'
+                                                : 'Assigned',
                                             style: TextStyle(
-                                              color: unassigned ? Colors.orange[800] : Colors.green[800],
+                                              color: unassigned
+                                                  ? Colors.orange[800]
+                                                  : Colors.green[800],
                                               fontWeight: FontWeight.bold,
                                               fontSize: 12,
                                             ),
@@ -194,11 +209,16 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
                                       '${lead['location']}, ${lead['state']}',
                                       style: TextStyle(color: Colors.grey[600]),
                                     ),
-                                    if (!unassigned && (lead['assignedToName'] as String).trim().isNotEmpty) ...[
+                                    if (!unassigned &&
+                                        (lead['assignedToName'] as String)
+                                            .trim()
+                                            .isNotEmpty) ...[
                                       const SizedBox(height: 6),
                                       Row(
                                         children: [
-                                          Icon(Icons.assignment_ind, size: 16, color: Colors.indigo.shade700),
+                                          Icon(Icons.assignment_ind,
+                                              size: 16,
+                                              color: Colors.indigo.shade700),
                                           const SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
@@ -216,7 +236,9 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
                                       const SizedBox(height: 6),
                                       Text(
                                         'Created: ${DateFormat('dd MMM, yyyy hh:mm a').format(lead['createdAt'] as DateTime)}',
-                                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                        style: TextStyle(
+                                            color: Colors.grey[500],
+                                            fontSize: 12),
                                       ),
                                     ],
                                     const SizedBox(height: 12),
@@ -228,18 +250,26 @@ class _AssignLeadListScreenState extends ConsumerState<AssignLeadListScreen>
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (_) => SurveyorSelectScreen(
-                                                    leadId: lead['id'] as String,
-                                                    leadName: lead['name'] as String,
+                                                  builder: (_) =>
+                                                      SurveyorSelectScreen(
+                                                    leadId:
+                                                        lead['id'] as String,
+                                                    leadName:
+                                                        lead['name'] as String,
                                                   ),
                                                 ),
                                               );
                                             },
-                                            icon: const Icon(Icons.assignment_ind, size: 18),
-                                            label: Text(unassigned ? 'Assign Surveyor' : 'Reassign'),
+                                            icon: const Icon(
+                                                Icons.assignment_ind,
+                                                size: 18),
+                                            label: Text(unassigned
+                                                ? 'Assign Surveyor'
+                                                : 'Reassign'),
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor: Colors.blue[800],
-                                              side: BorderSide(color: Colors.blue[800]!),
+                                              side: BorderSide(
+                                                  color: Colors.blue[800]!),
                                             ),
                                           ),
                                         ),

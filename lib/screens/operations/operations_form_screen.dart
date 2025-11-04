@@ -22,7 +22,7 @@ class OperationsFormScreen extends ConsumerStatefulWidget {
 class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
   bool _saving = false;
   final _imagePicker = ImagePicker();
-  
+
   // Track uploading state for each image
   final Map<String, bool> _uploadingImages = {};
 
@@ -116,15 +116,16 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
 
       // Upload image to Firebase Storage
       final imageFile = File(pickedFile.path);
-      final imageUrl = await ref.read(operationsServiceProvider).uploadInstallationImage(
-        leadId: widget.lead.uid,
-        imageKey: imageKey,
-        imageFile: imageFile,
-      );
+      final imageUrl =
+          await ref.read(operationsServiceProvider).uploadInstallationImage(
+                leadId: widget.lead.uid,
+                imageKey: imageKey,
+                imageFile: imageFile,
+              );
 
       // Update Firestore with the new image URL
       await FirebaseFirestore.instance
-          .collection('leadPool')
+          .collection('lead')
           .doc(widget.lead.uid)
           .update({
         'installation.$imageKey': imageUrl,
@@ -142,7 +143,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
           ),
           backgroundColor: Colors.green.shade700,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } catch (e) {
@@ -158,7 +160,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             ),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -209,12 +212,16 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                 color: Colors.white,
               ),
               const SizedBox(width: 12),
-              Text(ops.isSubmitted ? 'Operations submitted successfully!' : 'Draft saved'),
+              Text(ops.isSubmitted
+                  ? 'Operations submitted successfully!'
+                  : 'Draft saved'),
             ],
           ),
-          backgroundColor: ops.isSubmitted ? Colors.green.shade700 : Colors.blue.shade700,
+          backgroundColor:
+              ops.isSubmitted ? Colors.green.shade700 : Colors.blue.shade700,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       Navigator.pop(context, true);
@@ -231,7 +238,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             ),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -278,7 +286,7 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
   @override
   Widget build(BuildContext context) {
     final installStream = FirebaseFirestore.instance
-        .collection('leadPool')
+        .collection('lead')
         .doc(widget.lead.uid)
         .snapshots()
         .map((snap) {
@@ -303,7 +311,7 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
         stream: installStream,
         builder: (context, snap) {
           final installation = snap.data ?? {};
-          
+
           // Build URL maps for required and optional images
           final Map<String, String?> requiredUrls = {
             for (final k in _requiredInstallImageKeys)
@@ -393,8 +401,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                               minHeight: 10,
                               backgroundColor: Colors.white24,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                percentage == 100 
-                                    ? Colors.greenAccent 
+                                percentage == 100
+                                    ? Colors.greenAccent
                                     : Colors.white,
                               ),
                             ),
@@ -405,7 +413,7 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                   ],
                 ),
               ),
-              
+
               // Scrollable Content
               Expanded(
                 child: ListView(
@@ -465,23 +473,29 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                         children: [
                           _pdfTile(
                             title: 'Acknowledgement',
-                            currentUrl: widget.lead.operations?.operationPdf1Url,
+                            currentUrl:
+                                widget.lead.operations?.operationPdf1Url,
                             pickedFile: pdf1,
-                            onPick: () => _pickPdf((f) => setState(() => pdf1 = f)),
+                            onPick: () =>
+                                _pickPdf((f) => setState(() => pdf1 = f)),
                           ),
                           const SizedBox(height: 8),
                           _pdfTile(
                             title: 'Feasibility Report',
-                            currentUrl: widget.lead.operations?.operationPdf2Url,
+                            currentUrl:
+                                widget.lead.operations?.operationPdf2Url,
                             pickedFile: pdf2,
-                            onPick: () => _pickPdf((f) => setState(() => pdf2 = f)),
+                            onPick: () =>
+                                _pickPdf((f) => setState(() => pdf2 = f)),
                           ),
                           const SizedBox(height: 8),
                           _pdfTile(
                             title: 'Jansamarth Registration PDF',
-                            currentUrl: widget.lead.operations?.jansamarthPdfUrl,
+                            currentUrl:
+                                widget.lead.operations?.jansamarthPdfUrl,
                             pickedFile: jansamarth,
-                            onPick: () => _pickPdf((f) => setState(() => jansamarth = f)),
+                            onPick: () =>
+                                _pickPdf((f) => setState(() => jansamarth = f)),
                           ),
                         ],
                       ),
@@ -497,8 +511,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                         _CheckboxItem(
                           label: 'Model Agreement',
                           value: checks.modelAgreement,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(modelAgreement: v)),
+                          onChanged: (v) => setState(() =>
+                              checks = checks.copyWith(modelAgreement: v)),
                         ),
                         _CheckboxItem(
                           label: 'PPA',
@@ -509,8 +523,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                         _CheckboxItem(
                           label: 'JIR/PCR Check',
                           value: checks.jirPcrCheck,
-                          onChanged: (v) =>
-                              setState(() => checks = checks.copyWith(jirPcrCheck: v)),
+                          onChanged: (v) => setState(
+                              () => checks = checks.copyWith(jirPcrCheck: v)),
                         ),
                       ],
                     ),
@@ -525,14 +539,14 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                         _CheckboxItem(
                           label: 'Company Letter Head',
                           value: checks.companyLetterHead,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(companyLetterHead: v)),
+                          onChanged: (v) => setState(() =>
+                              checks = checks.copyWith(companyLetterHead: v)),
                         ),
                         _CheckboxItem(
                           label: 'TOD Warranty',
                           value: checks.todWarranty,
-                          onChanged: (v) =>
-                              setState(() => checks = checks.copyWith(todWarranty: v)),
+                          onChanged: (v) => setState(
+                              () => checks = checks.copyWith(todWarranty: v)),
                         ),
                         _CheckboxItem(
                           label: 'GTP',
@@ -564,32 +578,32 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                         _CheckboxItem(
                           label: 'Meter Installation',
                           value: checks.meterInstallation,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(meterInstallation: v)),
+                          onChanged: (v) => setState(() =>
+                              checks = checks.copyWith(meterInstallation: v)),
                         ),
                         _CheckboxItem(
                           label: 'Stealing Report',
                           value: checks.stealingReport,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(stealingReport: v)),
+                          onChanged: (v) => setState(() =>
+                              checks = checks.copyWith(stealingReport: v)),
                         ),
                         _CheckboxItem(
                           label: 'JIR/PCR Signing UPCL',
                           value: checks.jirPcrSigningUpcl,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(jirPcrSigningUpcl: v)),
+                          onChanged: (v) => setState(() =>
+                              checks = checks.copyWith(jirPcrSigningUpcl: v)),
                         ),
                         _CheckboxItem(
                           label: 'Central Subsidy Redeem',
                           value: checks.centralSubsidyRedeem,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(centralSubsidyRedeem: v)),
+                          onChanged: (v) => setState(() => checks =
+                              checks.copyWith(centralSubsidyRedeem: v)),
                         ),
                         _CheckboxItem(
                           label: 'State Subsidy Applying',
                           value: checks.stateSubsidyApplying,
-                          onChanged: (v) => setState(
-                              () => checks = checks.copyWith(stateSubsidyApplying: v)),
+                          onChanged: (v) => setState(() => checks =
+                              checks.copyWith(stateSubsidyApplying: v)),
                         ),
                       ],
                     ),
@@ -604,8 +618,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                         _CheckboxItem(
                           label: 'Full Payment',
                           value: checks.fullPayment,
-                          onChanged: (v) =>
-                              setState(() => checks = checks.copyWith(fullPayment: v)),
+                          onChanged: (v) => setState(
+                              () => checks = checks.copyWith(fullPayment: v)),
                         ),
                       ],
                     ),
@@ -662,7 +676,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : const Icon(Icons.check_circle_outline, size: 20),
@@ -717,7 +732,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.person_outline, color: Colors.white, size: 24),
+                  child: const Icon(Icons.person_outline,
+                      color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 14),
                 const Text(
@@ -734,7 +750,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             const SizedBox(height: 12),
             _infoRow(Icons.phone_outlined, 'Contact', widget.lead.number),
             const SizedBox(height: 12),
-            _infoRow(Icons.location_on_outlined, 'Location', widget.lead.fullAddress),
+            _infoRow(Icons.location_on_outlined, 'Location',
+                widget.lead.fullAddress),
           ],
         ),
       ),
@@ -863,7 +880,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: completed == total
@@ -896,7 +914,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: items.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: Colors.grey.shade200),
               itemBuilder: (context, index) {
                 final item = items[index];
                 return _buildCheckboxTile(
@@ -913,15 +932,17 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
     );
   }
 
-  Widget _plantImagesGrid(Map<String, String?> urls, {required bool isOptional}) {
+  Widget _plantImagesGrid(Map<String, String?> urls,
+      {required bool isOptional}) {
     final tiles = <Widget>[];
     String labelize(String key) {
       final s = key.replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m[1]}');
       return s[0].toUpperCase() + s.substring(1);
     }
 
-    urls.forEach((k, v) => tiles.add(_plantImageTile(labelize(k), v, k, isOptional: isOptional)));
-    
+    urls.forEach((k, v) =>
+        tiles.add(_plantImageTile(labelize(k), v, k, isOptional: isOptional)));
+
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -929,10 +950,11 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
     );
   }
 
-  Widget _plantImageTile(String label, String? url, String imageKey, {required bool isOptional}) {
+  Widget _plantImageTile(String label, String? url, String imageKey,
+      {required bool isOptional}) {
     final has = url != null && url.isNotEmpty;
     final isUploading = _uploadingImages[imageKey] == true;
-    
+
     return InkWell(
       onTap: () {
         if (isUploading) return;
@@ -949,9 +971,9 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: has 
+            color: has
                 ? Colors.green.shade400
-                : isOptional 
+                : isOptional
                     ? Colors.grey.shade300
                     : Colors.orange.shade300,
             width: 2,
@@ -972,7 +994,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                   child: AspectRatio(
                     aspectRatio: 1,
                     child: isUploading
@@ -1035,7 +1058,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                     top: 4,
                     right: 4,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.blue.shade700,
                         borderRadius: BorderRadius.circular(6),
@@ -1072,7 +1096,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
     );
   }
 
-  void _showImageOptionsDialog(BuildContext context, String url, String label, String imageKey) {
+  void _showImageOptionsDialog(
+      BuildContext context, String url, String label, String imageKey) {
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -1094,7 +1119,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                     loadingBuilder: (ctx, child, prog) => prog == null
                         ? child
                         : const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
+                            child:
+                                CircularProgressIndicator(color: Colors.white),
                           ),
                   ),
                 ),
@@ -1108,7 +1134,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
                       color: Colors.blue.shade700,
                       borderRadius: BorderRadius.circular(20),
                       child: IconButton(
-                        icon: const Icon(Icons.upload_file, color: Colors.white),
+                        icon:
+                            const Icon(Icons.upload_file, color: Colors.white),
                         tooltip: 'Replace Image',
                         onPressed: () {
                           Navigator.pop(context);
@@ -1188,8 +1215,9 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: (allInstallImagesPresent ? Colors.green : Colors.orange)
-                      .withOpacity(0.3),
+                  color:
+                      (allInstallImagesPresent ? Colors.green : Colors.orange)
+                          .withOpacity(0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -1197,7 +1225,9 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             ),
             child: Icon(
               allInstallImagesPresent ? Icons.check_circle : Icons.info,
-              color: allInstallImagesPresent ? Colors.green.shade800 : Colors.orange.shade800,
+              color: allInstallImagesPresent
+                  ? Colors.green.shade800
+                  : Colors.orange.shade800,
               size: 24,
             ),
           ),
@@ -1277,7 +1307,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
         ],
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         leading: Container(
           padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
@@ -1291,7 +1322,11 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: (hasPicked ? Colors.blue : hasUploaded ? Colors.green : Colors.grey)
+                color: (hasPicked
+                        ? Colors.blue
+                        : hasUploaded
+                            ? Colors.green
+                            : Colors.grey)
                     .withOpacity(0.3),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
@@ -1449,7 +1484,8 @@ class _OperationsFormScreenState extends ConsumerState<OperationsFormScreen> {
             ),
             if (value)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.green.shade400, Colors.green.shade600],
