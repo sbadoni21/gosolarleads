@@ -4,8 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gosolarleads/models/operations_models.dart';
+import 'package:gosolarleads/providers/operations_provider.dart';
+import 'package:gosolarleads/screens/leads/tabs/installation_assignment_card.dart';
+import 'package:gosolarleads/screens/leads/tabs/survey_tab_sales_details.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 
 import 'package:gosolarleads/models/installation_models.dart';
 import 'package:gosolarleads/models/lead_note_models.dart';
@@ -260,7 +266,7 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
                 onRefresh: _refresh,
                 child: Column(
                   children: [
-                    _buildSurveyAssignmentCard(lead),
+                    buildSurveyAssignmentCard(lead, context),
                   ],
                 ),
               ),
@@ -270,7 +276,7 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
                 onRefresh: _refresh,
                 child: Column(
                   children: [
-                    _installationAssignmentCard(
+                    installationAssignmentCard(
                       context,
                       lead,
                       isAdmin,
@@ -281,6 +287,7 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
                         lead.installation?.assignTo,
                         lead.installation?.installerName,
                       ].any((v) => (v ?? '').toString().trim().isNotEmpty),
+                      ref,
                     ),
                     _buildInstallationInfoCard(lead),
                   ],
@@ -293,7 +300,7 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
                 child: Column(
                   children: [
                     _operationsAssignmentCard(context, lead),
-                    _operationsDetailsCard(lead),
+                    _operationsDetailsCard(lead, ref),
                   ],
                 ),
               ),
@@ -1348,125 +1355,6 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
     }
   }
 
-  Widget _buildSurveyAssignmentCard(LeadPool lead) {
-    final Survey? survey = lead.survey; // <-- comes from leadStreamProvider
-
-    final String assignTo = (survey?.assignTo ?? '').trim();
-    final String assigneeName =
-        (survey?.surveyorName ?? '').trim(); // <-- correct field
-    final bool isUnassigned = assignTo.isEmpty;
-
-    return Card(
-      elevation: 2,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.yellow.withOpacity(.4),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isUnassigned
-                      ? Colors.orange.withOpacity(0.12)
-                      : Colors.green.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  isUnassigned
-                      ? Icons.assignment_late
-                      : Icons.assignment_turned_in,
-                  color: isUnassigned ? Colors.orange : Colors.green,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Survey Assignment',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              if (survey != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    (survey.status.isNotEmpty ? survey.status : 'draft')
-                        .toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-            ]),
-            const SizedBox(height: 12),
-            if (isUnassigned)
-              _warningBox('This lead is not assigned to any surveyor.')
-            else
-              _okBox(
-                  'Assigned to: ${assigneeName.isNotEmpty ? assigneeName : assignTo}'),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: Icon(
-                        isUnassigned ? Icons.assignment_ind : Icons.swap_horiz,
-                        color: Colors.white,
-                        size: 18),
-                    label: Text(
-                      isUnassigned ? 'Assign Surveyor' : 'Reassign',
-                      style: TextStyle(color: Colors.black),
-                    ),
-                    onPressed: () => _openAssignSurveyor(lead),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      side: BorderSide(color: Colors.black),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (survey != null) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // Optional: show key survey details coming from backend
-              _kv('Survey Date', survey.surveyDate),
-              _kv('Approval Date', survey.approvalDate),
-              _kv('Plant Type', survey.plantType),
-              _kv('Inverter Type', survey.inverterType),
-              _kv('Connection', survey.connectionType),
-              _kv('kW', survey.numberOfKW),
-              _kv('Plant Cost', survey.plantCost),
-              _kv('Structure', survey.structureType),
-              _kv('Inverter Placement', survey.inverterPlacement),
-              _kv('Earthing Type', survey.earthingType),
-              _kv('Earthing Wire', survey.earthingWireType),
-              _kv('Additional Requirements', survey.additionalRequirements),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _warningBox(String text) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -1479,26 +1367,6 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
             const Icon(Icons.warning_amber, color: Colors.orange, size: 18),
             const SizedBox(width: 8),
             Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
-          ],
-        ),
-      );
-
-  Widget _okBox(String text) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.green.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.badge, color: Colors.green, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(text,
-                  style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
           ],
         ),
       );
@@ -1519,251 +1387,6 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
           ],
         ),
       );
-
-  Widget _installationAssignmentCard(
-    BuildContext context,
-    LeadPool lead,
-    bool isAdmin,
-    bool canAssignInstaller,
-    bool hasInstaller,
-  ) {
-    String _pickFirstNonEmpty(List<String?> options) {
-      for (final v in options) {
-        if ((v ?? '').trim().isNotEmpty) return v!.trim();
-      }
-      return '';
-    }
-
-    // colors & icons based on state
-    final Color stateColor =
-        hasInstaller ? AppTheme.successGreen : AppTheme.warningAmber;
-    final IconData stateIcon = hasInstaller
-        ? Icons.verified_user_outlined
-        : Icons.person_search_outlined;
-    final String stateText =
-        hasInstaller ? 'Installer Assigned' : 'Installer Unassigned';
-
-    // simple checklist: tailor these to your actual rules
-    final bool isSubmitted = (lead.status ?? '').toLowerCase() == 'submitted' ||
-        (lead.status ?? '').toLowerCase() == 'completed' ||
-        (lead.status ?? '').toLowerCase() == 'assigned';
-    final bool surveyDone = lead.surveyStatus == true;
-    final assignedName = _pickFirstNonEmpty([
-      lead.installationAssignedToName,
-      lead.installation?.assignTo,
-      lead.installationAssignedTo,
-      lead.installation?.installerName,
-    ]);
-
-    final assignedLabel = assignedName.isEmpty ? 'Unknown' : assignedName;
-
-    // helper: small checklist row
-    Widget _check(String text, bool ok) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            ok ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 16,
-            color: ok ? AppTheme.successGreen : AppTheme.mediumGrey,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              color: ok ? AppTheme.darkGrey : AppTheme.mediumGrey,
-              fontWeight: ok ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppTheme.mediumGrey.withOpacity(0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: Title + status chip
-            Row(
-              children: [
-                const Icon(Icons.handyman_outlined,
-                    size: 20, color: AppTheme.primaryBlue),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Installation Assignment',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Assigned row (or unassigned)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: hasInstaller
-                    ? AppTheme.successGreen.withOpacity(0.08)
-                    : AppTheme.warningAmber.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: hasInstaller
-                      ? AppTheme.successGreen.withOpacity(0.25)
-                      : AppTheme.warningAmber.withOpacity(0.25),
-                ),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: stateColor.withOpacity(0.12),
-                    child: Icon(
-                      stateIcon,
-                      size: 18,
-                      color: stateColor,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      hasInstaller
-                          ? 'Assigned to $assignedLabel'
-                          : 'No installer assigned yet',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (isAdmin)
-                    Tooltip(
-                      message: canAssignInstaller
-                          ? (hasInstaller
-                              ? 'Reassign installer'
-                              : 'Assign installer')
-                          : 'Lead must be submitted and survey completed',
-                      child: FilledButton.tonalIcon(
-                        onPressed: canAssignInstaller
-                            ? () => _openInstallerAssignDialog(context, lead)
-                            : null,
-                        icon: Icon(hasInstaller
-                            ? Icons.swap_horiz
-                            : Icons.person_add_alt_1),
-                        label: Text(hasInstaller ? 'Reassign' : 'Assign'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(0, 36),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Requirements / helpful info
-            Row(
-              children: [
-                _check('Lead submitted', isSubmitted),
-                const SizedBox(width: 12),
-                _check('Survey complete', surveyDone),
-              ],
-            ),
-
-            // Inline reason when disabled (clear UX)
-            if (isAdmin && !canAssignInstaller) ...[
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline,
-                      size: 16, color: AppTheme.warningAmber),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'You can assign an installer after the lead is submitted and the survey is marked complete.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.darkGrey.withOpacity(0.85),
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            // Optional: tiny footnotes about current lead state (safe guards)
-            if ((lead.status ?? '').isNotEmpty ||
-                lead.surveyStatus != null) ...[
-              const SizedBox(height: 10),
-              Divider(height: 1, color: AppTheme.mediumGrey.withOpacity(0.25)),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if ((lead.status ?? '').isNotEmpty)
-                    Chip(
-                      visualDensity: VisualDensity.compact,
-                      label: Text(
-                        'Lead: ${(lead.status ?? '').toString().toUpperCase()}',
-                        style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                      avatar: const Icon(Icons.flag_outlined, size: 16),
-                      backgroundColor: Colors.grey.withOpacity(0.08),
-                      side: BorderSide(
-                          color: AppTheme.mediumGrey.withOpacity(0.25)),
-                    ),
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(
-                      'Survey: ${surveyDone ? 'COMPLETED' : 'PENDING'}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: surveyDone
-                            ? AppTheme.successGreen
-                            : AppTheme.warningAmber,
-                      ),
-                    ),
-                    avatar: Icon(
-                      surveyDone ? Icons.check_circle : Icons.hourglass_bottom,
-                      size: 16,
-                      color: surveyDone
-                          ? AppTheme.successGreen
-                          : AppTheme.warningAmber,
-                    ),
-                    backgroundColor: Colors.grey.withOpacity(0.08),
-                    side: BorderSide(
-                        color: AppTheme.mediumGrey.withOpacity(0.25)),
-                  ),
-                ],
-              ),
-              if (lead.installation != null) ...[
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-              ],
-            ],
-            _buildInstallationInfoCard(lead)
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _openUrl(String url) async {
     try {
@@ -2461,142 +2084,6 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
     );
   }
 
-  Future<void> _openInstallerAssignDialog(
-      BuildContext context, LeadPool lead) async {
-    final currentUser = ref.read(currentUserProvider).value;
-    final canAssign = currentUser?.isAdmin == true ||
-        currentUser?.isSuperAdmin == true ||
-        currentUser?.isSales == true;
-    if (!canAssign) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can assign installers')),
-      );
-      return;
-    }
-
-    try {
-      // Fetch only installation-role users
-      final qs = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'installation')
-          .orderBy('name')
-          .get();
-
-      final installers = qs.docs
-          .map((d) => {
-                'uid': d.id,
-                'name': d['name'] ?? d['email'] ?? 'Installer',
-                'email': d['email'] ?? ''
-              })
-          .toList();
-
-      if (!mounted) return;
-
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Assign Installer'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: installers.length,
-              separatorBuilder: (_, __) => const Divider(height: 0),
-              itemBuilder: (_, i) {
-                final u = installers[i];
-                final uid = (u['uid'] ?? '').toString();
-                final display =
-                    (u['name'] ?? u['email'] ?? 'Installer').toString();
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
-                    child: Text(
-                      display.substring(0, 1).toUpperCase(),
-                      style: const TextStyle(
-                        color: AppTheme.primaryBlue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  title: Text(display),
-                  subtitle: Text((u['email'] ?? '').toString()),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    // Start installation SLA on assignment (30 days default)
-                    await FirebaseFirestore.instance
-                        .collection('leadPool')
-                        .doc(lead.uid)
-                        .update({
-                      // flat
-                      'installationAssignedTo': uid,
-                      'installationAssignedToName': display,
-                      'installationAssignedAt': FieldValue.serverTimestamp(),
-
-                      // nested (if you also keep one)
-                      'installation.installationAssignedTo': uid,
-                      'installation.installationAssignedToName': display,
-                      'installation.installationAssignedAt':
-                          FieldValue.serverTimestamp(),
-                    });
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text('Installer assigned to $display')),
-                      );
-                      // Optional: refresh the lead
-                      ref.invalidate(leadStreamProvider(lead.uid));
-                    }
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel')),
-            if (lead.installationAssignedTo != null &&
-                lead.installationAssignedTo!.isNotEmpty)
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await FirebaseFirestore.instance
-                      .collection('leadPool')
-                      .doc(lead.uid)
-                      .update({
-                    'installationAssignedTo': null,
-                    'installationAssignedToName': null,
-                    'installationAssignedAt': null,
-                    'installation.installationAssignedTo': null,
-                    'installation.installationAssignedToName': null,
-                    'installation.installationAssignedAt': null,
-                    // Optionally stop/reset installation SLA if you want when unassigning:
-                    // 'installationSlaStartDate': null,
-                    // 'installationSlaEndDate': null,
-                    // 'installationCompletedAt': null,
-                  });
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Installer unassigned')),
-                    );
-                    ref.invalidate(leadStreamProvider(lead.uid));
-                  }
-                },
-                child: const Text('Unassign'),
-              ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e')),
-      );
-    }
-  }
-
   Widget _operationsAssignmentCard(BuildContext context, LeadPool lead) {
     final opsStream = FirebaseFirestore.instance
         .collection('leadPool')
@@ -2817,7 +2304,8 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
     );
   }
 
-  Widget _operationsDetailsCard(LeadPool lead) {
+// Add to your existing widget
+  Widget _operationsDetailsCard(LeadPool lead, WidgetRef ref) {
     final opsStream = FirebaseFirestore.instance
         .collection('leadPool')
         .doc(lead.uid)
@@ -2838,49 +2326,201 @@ class _SalesLeadScreenState extends ConsumerState<SalesLeadScreen>
         final ops = snap.data;
         if (ops == null) {
           return Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('No operations record yet.'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.engineering_outlined,
+                            color: Colors.blue, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Operations',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No operations record yet.',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
+
         final status = _s(ops['status']).toUpperCase();
+        final statusColor = status == 'SUBMITTED'
+            ? Colors.green
+            : status == 'DRAFT'
+                ? Colors.orange
+                : Colors.grey;
+
         return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Operations',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
+                // Header
                 Row(
                   children: [
-                    Chip(label: Text(status.isEmpty ? 'DRAFT' : status)),
-                    const SizedBox(width: 8),
-                    Text('Assignee: ${_s(ops['assignToName'])}'),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.engineering_outlined,
+                          color: Colors.blue, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Operations',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: statusColor.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            status == 'SUBMITTED'
+                                ? Icons.check_circle
+                                : status == 'DRAFT'
+                                    ? Icons.edit_note
+                                    : Icons.info_outline,
+                            size: 16,
+                            color: statusColor.shade700,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            status.isEmpty ? 'DRAFT' : status,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                if (_s(ops['operationPdf1Url']) != '-')
-                  TextButton.icon(
-                    onPressed: () {}, // open url
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Operation PDF 1'),
+                const SizedBox(height: 16),
+
+                // Assignee Info
+                if (_s(ops['assignToName']) != '-')
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline,
+                            size: 18, color: Colors.grey.shade700),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Assigned to: ',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        Text(
+                          _s(ops['assignToName']),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                if (_s(ops['operationPdf2Url']) != '-')
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Operation PDF 2'),
+                const SizedBox(height: 16),
+
+                // Documents Section
+                const Text(
+                  'Documents',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                   ),
-                if (_s(ops['jansamarthPdfUrl']) != '-')
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Jansamarth PDF'),
-                  ),
+                ),
+                const SizedBox(height: 12),
+
+                _buildDocumentUploadSection(
+                  context: context,
+                  ref: ref,
+                  lead: lead,
+                  documents: [
+                    _DocumentItem(
+                      title: 'Acknowledgement',
+                      url: _s(ops['operationPdf1Url']),
+                      fileKey: 'operationPdf1',
+                      icon: Icons.receipt_long_outlined,
+                      color: Colors.blue,
+                    ),
+                    _DocumentItem(
+                      title: 'Feasibility Report',
+                      url: _s(ops['operationPdf2Url']),
+                      fileKey: 'operationPdf2',
+                      icon: Icons.assessment_outlined,
+                      color: Colors.green,
+                    ),
+                    _DocumentItem(
+                      title: 'Jansamarth Registration',
+                      url: _s(ops['jansamarthPdfUrl']),
+                      fileKey: 'jansamarthPdf',
+                      icon: Icons.how_to_reg_outlined,
+                      color: Colors.orange,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -3052,6 +2692,351 @@ class _CountBadge extends StatelessWidget {
           height: 1.1,
           letterSpacing: .1,
         ),
+      ),
+    );
+  }
+}
+
+class _DocumentItem {
+  final String title;
+  final String url;
+  final String fileKey;
+  final IconData icon;
+  final Color color;
+
+  _DocumentItem({
+    required this.title,
+    required this.url,
+    required this.fileKey,
+    required this.icon,
+    required this.color,
+  });
+}
+
+Widget _buildDocumentUploadSection({
+  required BuildContext context,
+  required WidgetRef ref,
+  required LeadPool lead,
+  required List<_DocumentItem> documents,
+}) {
+  return Column(
+    children: documents.map((doc) {
+      final hasDocument = doc.url != '-' && doc.url.isNotEmpty;
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasDocument ? doc.color : Colors.grey.shade300,
+            width: 1.5,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: doc.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  doc.icon,
+                  color: doc.color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Document Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      doc.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          hasDocument
+                              ? Icons.check_circle
+                              : Icons.cloud_upload_outlined,
+                          size: 14,
+                          color: hasDocument ? doc.color : Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          hasDocument ? 'Uploaded' : 'Not uploaded',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                hasDocument ? doc.color : Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Action Buttons
+              if (hasDocument)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // View Button
+                    IconButton(
+                      onPressed: () =>
+                          _viewDocument(context, doc.url, doc.title),
+                      icon: Icon(Icons.visibility_outlined, color: doc.color),
+                      tooltip: 'View',
+                      style: IconButton.styleFrom(
+                        backgroundColor: doc.color.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Download Button
+                    IconButton(
+                      onPressed: () =>
+                          _downloadDocument(context, doc.url, doc.title),
+                      icon: Icon(Icons.download_outlined, color: doc.color),
+                      tooltip: 'Download',
+                      style: IconButton.styleFrom(
+                        backgroundColor: doc.color.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                // Upload Button
+                ElevatedButton.icon(
+                  onPressed: () => _uploadDocument(
+                    context,
+                    ref,
+                    lead,
+                    doc.fileKey,
+                    doc.title,
+                  ),
+                  icon: const Icon(Icons.upload_file, size: 16),
+                  label: const Text('Upload'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: doc.color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }).toList(),
+  );
+}
+
+Future<void> _viewDocument(
+    BuildContext context, String url, String title) async {
+  final uri = Uri.parse(url);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Could not open document')),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
+
+Future<void> _downloadDocument(
+    BuildContext context, String url, String title) async {
+  try {
+    final uri = Uri.parse(url);
+    // For mobile, this will open in browser which has download option
+    // For web, it will download directly
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.download_done, color: Colors.white),
+              const SizedBox(width: 12),
+              Text('Opening $title for download...'),
+            ],
+          ),
+          backgroundColor: Colors.blue.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      throw 'Could not launch URL';
+    }
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Download failed')),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
+
+Future<void> _uploadDocument(
+  BuildContext context,
+  WidgetRef ref,
+  LeadPool lead,
+  String fileKey,
+  String title,
+) async {
+  try {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+
+    if (result == null || result.files.single.path == null) {
+      return;
+    }
+
+    final file = File(result.files.single.path!);
+
+    // Show loading dialog
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => WillPopScope(
+        onWillPop: () async => false,
+        child: Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'Uploading $title...',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Get current user
+    final user = ref.read(currentUserProvider).value;
+
+    // Preserve existing operations data or create new one
+    final existingOps = lead.operations;
+    final operations = Operations(
+      operationPdf1Url: existingOps?.operationPdf1Url,
+      operationPdf2Url: existingOps?.operationPdf2Url,
+      jansamarthPdfUrl: existingOps?.jansamarthPdfUrl,
+      checkboxes: existingOps?.checkboxes ?? const OpsChecks(),
+      status: existingOps?.status ?? 'draft',
+      assignTo: existingOps?.assignTo ?? lead.operationsAssignedTo,
+      assignToName: existingOps?.assignToName ?? lead.operationsAssignedToName,
+      updatedAt: DateTime.now(),
+      updatedByUid: user?.uid,
+      updatedByName: user?.name ?? user?.email,
+    );
+
+    // Upload the file
+    await ref.read(operationsServiceProvider).saveOperations(
+      leadId: lead.uid,
+      operations: operations,
+      files: {fileKey: file},
+    );
+
+    if (!context.mounted) return;
+    Navigator.pop(context); // Close loading dialog
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Text('$title uploaded successfully!'),
+          ],
+        ),
+        backgroundColor: Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    Navigator.pop(context); // Close loading dialog if open
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text('Upload failed: $e')),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
